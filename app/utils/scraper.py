@@ -10,31 +10,45 @@ def get_list_text(els):
     return [el.get_text(strip=True) for el in els if el.get_text(strip=True)]
 
 # --------- Extract simple high-value keywords from body ---------
+import re
+
+SHORT_KEYWORDS = {
+    "ai","ml","llm","nlp","cv","dl","rl","gpt",
+    "ar","vr","xr",
+    "api","sdk","cli","dev","ops","ci","cd","git","k8s",
+    "aws","gcp","azure","sql","db","gpu","cpu","vm",
+    "etl","bi","rt",
+    "iam","ssl","tls","vpn",
+    "ux","ui","qa","pm",
+    "iot","ble","rf","pcb","usb"
+}
+
+STOPWORDS = {
+    "the","and","for","with","this","that","from","are","was","our","your",
+    "but","you","they","their","them","all","any","can","more","about","into",
+    "over","also","how","why","what","when","where","who","use","used","using",
+    "on","in","at","of","to","as","is","it","be","or","by","we","an","a","so","do"
+}
+
 def extract_keywords(text: str, limit: int = 25):
-    # Lowercase
     text = text.lower()
+    text = re.sub(r"[^a-z ]+", " ", text)
+    words = text.split()
 
-    # Remove numbers, punctuation
-    text = re.sub(r"[^a-zA-Z ]+", " ", text)
-
-    # Common stopwords to exclude
-    stopwords = {
-        "the","and","for","with","this","that","from","are","was","our",
-        "your","but","you","they","their","them","all","any","can",
-        "more","about","into","over","also","how","why","what","when",
-        "where","who","use","used","using","we","on","in","at","of","to"
-    }
-
-    words = [w for w in text.split() if len(w) > 3 and w not in stopwords]
-
-    # Frequency count
-    freq = {}
+    clean = []
     for w in words:
+        if w in SHORT_KEYWORDS:
+            clean.append(w)
+        elif w not in STOPWORDS and len(w) > 3:
+            clean.append(w)
+
+    freq = {}
+    for w in clean:
         freq[w] = freq.get(w, 0) + 1
 
-    # Sort by frequency, return top words
-    keywords = sorted(freq, key=freq.get, reverse=True)
-    return keywords[:limit]
+    sorted_words = sorted(freq, key=freq.get, reverse=True)
+    return sorted_words[:limit]
+
 
 
 # --------------------------------------------------------
