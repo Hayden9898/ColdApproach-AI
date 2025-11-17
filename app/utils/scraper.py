@@ -1,7 +1,7 @@
 from bs4 import BeautifulSoup
 import requests
 import logging
-import json
+import re
 
 def get_text_or_none(el):
     return el.get_text(strip=True) if el else None
@@ -9,20 +9,49 @@ def get_text_or_none(el):
 def get_list_text(els):
     return [el.get_text(strip=True) for el in els if el.get_text(strip=True)]
 
+# --------- Extract simple high-value keywords from body ---------
+def extract_keywords(text: str, limit: int = 25):
+    # Lowercase
+    text = text.lower()
+
+    # Remove numbers, punctuation
+    text = re.sub(r"[^a-zA-Z ]+", " ", text)
+
+    # Common stopwords to exclude
+    stopwords = {
+        "the","and","for","with","this","that","from","are","was","our",
+        "your","but","you","they","their","them","all","any","can",
+        "more","about","into","over","also","how","why","what","when",
+        "where","who","use","used","using","we","on","in","at","of","to"
+    }
+
+    words = [w for w in text.split() if len(w) > 3 and w not in stopwords]
+
+    # Frequency count
+    freq = {}
+    for w in words:
+        freq[w] = freq.get(w, 0) + 1
+
+    # Sort by frequency, return top words
+    keywords = sorted(freq, key=freq.get, reverse=True)
+    return keywords[:limit]
+
+
+# --------------------------------------------------------
+# MAIN SCRAPER
+# --------------------------------------------------------
 def scrape_company(url: str):
     try:
         response = requests.get(url, timeout=10)
         response.raise_for_status()
-        soup = BeautifulSoup(response.text, 'html.parser')
+        soup = BeautifulSoup(response.text, "html.parser")
 
-        # Extract title
+        # ---------- Title ----------
         title_tag = soup.find("title")
         title_text = get_text_or_none(title_tag)
 
-        # Check if blocked early
-        blocked = False
+        # Blocked check
         if title_text and "blocked" in title_text.lower():
-            blocked = True
             return {
                 "url": url,
                 "blocked": True,
@@ -30,43 +59,25 @@ def scrape_company(url: str):
                 "description": None,
                 "og_description": None,
                 "h1": [],
-                "h2": [],
-                "nav": [],
-                "summary_text": None,
-                "schema_org": []
+                "summary_keywords": []
             }
 
-        # Extract meta description
+        # ---------- Meta description ----------
         meta_desc = soup.find("meta", attrs={"name": "description"})
         description = meta_desc["content"] if meta_desc and meta_desc.get("content") else None
 
-        # Extract OpenGraph description
+        # ---------- OG description ----------
         og_desc = soup.find("meta", property="og:description")
         og_description = og_desc["content"] if og_desc and og_desc.get("content") else None
 
-        # Extract headings
-        h1_list = get_list_text(soup.find_all("h1"))
-        h2_list = get_list_text(soup.find_all("h2"))
+        # ---------- H1 Headings ----------
+        h1_list = get_list_text(soup.find_all("h1"))[:4]
 
-        # Navigation links
-        nav_links = []
-        for link in soup.find_all("a"):
-            text = link.get_text(strip=True)
-            if text and 2 <= len(text) <= 30:
-                nav_links.append(text)
-
-        # Summary text
+        # ---------- Extract High-Value Keywords (mini summary) ----------
         full_text = soup.get_text(" ", strip=True)
-        summary_text = full_text[:400] if full_text else None
+        summary_keywords = extract_keywords(full_text, limit=40)
 
-        # Schema.org JSON-LD
-        schema_list = []
-        for script in soup.find_all("script", type="application/ld+json"):
-            try:
-                schema_list.append(json.loads(script.string))
-            except:
-                pass
-
+        # ---------- Return clean data ----------
         return {
             "url": url,
             "blocked": False,
@@ -74,10 +85,7 @@ def scrape_company(url: str):
             "description": description,
             "og_description": og_description,
             "h1": h1_list,
-            "h2": h2_list,
-            "nav": nav_links,
-            "summary_text": summary_text,
-            "schema_org": schema_list
+            "summary_keywords": summary_keywords
         }
 
     except Exception as e:

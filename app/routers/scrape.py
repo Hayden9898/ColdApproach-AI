@@ -8,6 +8,11 @@ def scrape_url(url: str):
     result = scrape_company(url)
     if result == "Error":
         return {"Error": "Failed to scrape company"}
+    if result["blocked"] == True:
+        #Use GPT to scrape
+        pass
     else:
+        #prompt
         return {"Company Data": result}
+
 
