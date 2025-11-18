@@ -27,7 +27,6 @@ STOPWORDS = {
     "the","and","for","with","this","that","from","are","was","our","your",
     "but","you","they","their","them","all","any","can","more","about","into",
     "over","also","how","why","what","when","where","who","use","used","using",
-    "on","in","at","of","to","as","is","it","be","or","by","we","an","a","so","do"
 }
 
 def extract_keywords(text: str, limit: int = 25):

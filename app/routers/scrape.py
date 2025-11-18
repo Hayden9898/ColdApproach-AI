@@ -1,4 +1,6 @@
 from fastapi import APIRouter
+
+from app.routers.generate import generate_prompt, get_openai_response
 from app.utils.scraper import scrape_company
 
 router = APIRouter(prefix="/scrape", tags=["scrape"])
@@ -9,10 +11,13 @@ def scrape_url(url: str):
     if result == "Error":
         return {"Error": "Failed to scrape company"}
     if result["blocked"] == True:
-        #Use GPT to scrape
+        #Use another method to scrape
         pass
     else:
-        #prompt
+        prompt = generate_prompt(result)
+        response = get_openai_response(prompt)
+        print(response)
+
         return {"Company Data": result}
 
 
