@@ -1,6 +1,6 @@
 from fastapi import APIRouter
 
-from app.routers.generate import generate_prompt, get_openai_response
+from app.utils.generate import generate_prompt, get_openai_response
 from app.utils.scraper import scrape_company
 
 router = APIRouter(prefix="/scrape", tags=["scrape"])
@@ -15,9 +15,9 @@ def scrape_url(url: str):
         pass
     else:
         prompt = generate_prompt(result)
-        response = get_openai_response(prompt)
+        response = get_openai_response(result)
         print(response)
 
-        return {"Company Data": result}
+        return {"Company Data": result, "prompt": prompt, "email_body": response}
 
 
