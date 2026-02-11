@@ -8,6 +8,7 @@ __pycache__/
 .Python
 
 # Virtual Environment
+.venv/
 venv/
 env/
 ENV/
@@ -22,4 +23,3 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
-

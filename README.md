@@ -2,7 +2,7 @@
 
 **AI-powered outreach that values quality over quantity.**  
 ColdReach AI helps students, job seekers, and developers connect more effectively with **startups and professionals** by crafting authentic, personalized cold emails.  
-The system automatically scrapes company and user data, finds the most relevant contact using the Apollo API, generates thoughtful drafts with GPT, and uses a lightweight ML model to ensure every message feels specific, relevant, and human before it’s ever sent.
+The system automatically scrapes company and user data, finds contact candidates using the Hunter API, ranks the best contact by role-fit, and uses a lightweight ML model to ensure every message feels specific, relevant, and human before it’s ever sent.
 
 ---
 
@@ -23,13 +23,14 @@ ColdReach AI takes the opposite approach: it **automates the research and writin
    ColdReach scrapes and summarizes these sources to understand the user’s skills, projects, and interests.  
    This user profile is stored securely (e.g., in AWS S3 or a database) and reused for future generations unless the user requests an update.
 
-2. **User enters a company link:**  
+2. **User enters a company name or company link:**  
    - ColdReach scrapes the company’s website (“About” page, meta tags, key paragraphs).  
    - Summarizes what the company does and extracts relevant keywords.
 
-3. **Apollo API integration:**  
-   - ColdReach queries the **Apollo.io database** to identify the most relevant contact (e.g., Head of Recruiting, CTO, or Project Lead).  
-   - Returns the name, position, and email address of the best contact to reach out to.
+3. **Hunter API integration:**  
+   - ColdReach calls Hunter Domain Search and fetches up to 10 contact candidates for that company.  
+   - It evaluates titles/roles using company-size strategy (`1-10`, `11-50`, `50+`) and selects the best-fit candidate.
+   - The response includes the top candidates (with roles and emails) plus a `best_contact` recommendation.
 
 4. **GPT-4 generates a draft:**  
    - Using the user’s profile + company summary + contact info, GPT creates a short, personalized cold email connecting the user’s experience to the company’s work.
@@ -53,7 +54,7 @@ ColdReach AI takes the opposite approach: it **automates the research and writin
 | **Machine Learning** | **scikit-learn (TF-IDF + Logistic Regression)** | Evaluate personalization quality |
 | **User Data Scraping** | **BeautifulSoup4, pdfminer, OpenAI summarization** | Extract profile info from resume, LinkedIn, and GitHub |
 | **Company Data Scraping** | **requests**, **BeautifulSoup4** | Summarize company content for GPT context |
-| **Contact Discovery** | **Apollo.io API** | Find the most relevant contact (CTO, recruiter, etc.) |
+| **Contact Discovery** | **Hunter.io API** | Find contact candidates and select the best-fit person by role |
 | **Cloud & Infrastructure** | **AWS SES**, **S3**, **IAM** | Send emails, store user data securely |
 | **Frontend** | **React + Tailwind CSS** | Simple interface for inputs, review, and analytics |
 | **Data & Tracking** | **pandas**, **CSV** → *Google Sheets or PostgreSQL (future)* | Log emails, scores, and statuses |
@@ -80,11 +81,13 @@ User Uploads (Resume, LinkedIn, GitHub)
  ↓  
 Scraper → Build & Cache User Profile (store in S3/DB)  
  ↓  
-User Enters Company URL  
+User Enters Company Name or URL  
  ↓  
 Scraper → Extract & Summarize Company Info  
  ↓  
-Apollo API → Fetch Relevant Contact (e.g., CTO or Recruiter)  
+Hunter API → Fetch up to 10 Candidate Contacts  
+ ↓  
+Role Ranking by Company Size → Choose Best Candidate  
  ↓  
 GPT-4 → Generate Personalized Email  
  ↓  
@@ -123,7 +126,8 @@ ColdReach tracks each email’s:
 A student uploads their resume, LinkedIn, and GitHub once.  
 They paste `https://clearcutar.com` into ColdReach.  
 The app scrapes that ClearCutAR builds AR imaging software for surgical wound care.  
-Apollo identifies “Lisa Chen — CTO” as the best contact.  
+Hunter returns up to 10 likely contacts and ColdReach ranks “Lisa Chen — CTO” as the best fit.  
+The response includes all fetched candidates and a best-contact recommendation for outreach.  
 GPT writes:  
 
 > “Hi Lisa, I loved your team’s work on AR imaging at ClearCutAR — I recently built a project that uses AI for real-time image processing…”  
@@ -135,5 +139,5 @@ The system logs: company, contact, email text, personalization score, and send s
 
 ## ☁️ Summary
 
-ColdReach AI blends **AI generation**, **ML evaluation**, **Apollo contact discovery**, and **cloud automation** to make outreach smarter, faster, and more meaningful.  
+ColdReach AI blends **AI generation**, **ML evaluation**, **Hunter-based contact discovery**, and **cloud automation** to make outreach smarter, faster, and more meaningful.  
 It empowers users to **connect with startups and professionals** through thoughtful, personalized communication — not spam.

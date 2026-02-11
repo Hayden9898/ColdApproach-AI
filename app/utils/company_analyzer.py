@@ -1,128 +1,168 @@
 """
-Company size analysis using Apollo employee count data.
-Categorizes companies and provides prioritized role arrays.
+Company size analysis and role ranking for outreach targeting.
 """
-from typing import List, Dict, Any, Optional
+from typing import Any, Dict, List, Optional
 
 
-def categorize_company_size(employee_count: Optional[int]) -> str:
+ROLE_PRIORITIES_BY_SIZE = {
+    # Smaller startups: decision makers can hire directly.
+    "small_1_10": [
+        "Co-Founder",
+        "Cofounder",
+        "Founder",
+        "CTO",
+        "CEO",
+        "Technical Co-Founder",
+        "Founding Engineer",
+        "Head of Engineering",
+    ],
+    # Growth startups: still technical leaders, plus hiring owners.
+    "mid_11_50": [
+        "CTO",
+        "VP Engineering",
+        "Head of Engineering",
+        "Engineering Director",
+        "Director of Engineering",
+        "Engineering Manager",
+        "Tech Lead",
+        "Lead Engineer",
+        "Project Lead",
+        "Founder",
+    ],
+    # Larger orgs: recruiting and org managers become better entry points.
+    "large_50_plus": [
+        "Technical Recruiter",
+        "Talent Acquisition",
+        "Senior Recruiter",
+        "Recruiter",
+        "Hiring Manager",
+        "Engineering Manager",
+        "Director of Engineering",
+        "VP Engineering",
+        "Head of Engineering",
+    ],
+    "unknown": [
+        "CTO",
+        "Founder",
+        "Head of Engineering",
+        "Engineering Manager",
+        "Technical Recruiter",
+    ],
+}
+
+
+def _normalize_headcount(employee_count: Any) -> Optional[int]:
     """
-    Categorize company size based on employee count from Apollo.
-    
-    Categories:
-    - small: 1-30 employees
-    - medium: 30-100 employees  
-    - large: 100+ employees
-    
-    Args:
-        employee_count: Number of employees (from Apollo)
-    
-    Returns:
-        "small", "medium", "large", or "unknown"
+    Convert Hunter headcount values to a representative integer when possible.
+
+    Examples:
+    - 12 -> 12
+    - "11-50" -> 50
+    - "50+" -> 50
     """
     if employee_count is None:
-        return "unknown"
-    
-    if employee_count <= 30:
-        return "small"
-    elif employee_count <= 100:
-        return "medium"
-    else:
-        return "large"
+        return None
+
+    if isinstance(employee_count, int):
+        return employee_count
+
+    if isinstance(employee_count, str):
+        value = employee_count.strip()
+        if not value:
+            return None
+        if "-" in value:
+            end = value.split("-")[-1]
+            try:
+                return int(end)
+            except ValueError:
+                return None
+        if value.endswith("+"):
+            try:
+                return int(value[:-1])
+            except ValueError:
+                return None
+        try:
+            return int(value)
+        except ValueError:
+            return None
+
+    return None
 
 
-def get_prioritized_roles_by_size(employee_count: Optional[int]) -> List[str]:
+def categorize_company_size(employee_count: Any) -> str:
     """
-    Get prioritized array of job titles based on company size.
-    
-    Roles are ordered by importance/priority for outreach.
-    
-    Strategy:
-    - Small (1-30): Decision makers first (CTO, Founders, CEO)
-    - Medium (30-100): Hiring managers (Lead Engineers, Engineering Managers)
-    - Large (100+): Recruiters and talent acquisition
-    
-    Args:
-        employee_count: Number of employees from Apollo
-    
-    Returns:
-        Prioritized list of job titles (most important first)
+    Categorize company size based on employee count.
+
+    Categories:
+    - small_1_10: 1-10 employees
+    - mid_11_50: 11-50 employees
+    - large_50_plus: 50+ employees
+    """
+    normalized = _normalize_headcount(employee_count)
+    if normalized is None:
+        return "unknown"
+
+    if normalized <= 10:
+        return "small_1_10"
+    if normalized <= 50:
+        return "mid_11_50"
+    if normalized > 50:
+        return "large_50_plus"
+    return "unknown"
+
+
+def get_prioritized_roles_by_size(employee_count: Any) -> List[str]:
+    """
+    Get prioritized outreach roles for configured company size ranges.
     """
     size = categorize_company_size(employee_count)
-    
-    # Prioritized role arrays - ordered by importance
-    role_priorities = {
-        "small": [
-            # 1-30 employees: Direct Decision Makers
-            "Founder",
-            "CTO",
-            "CEO",
-            "Co-Founder",
-            "Co-founder",
-            "Chief Technology Officer",
-            "Chief Executive Officer",
-            "Technical Co-Founder",
-        ],
-        "medium": [
-            # 31-100 employees: Hiring Managers & Directors
-            "VP Engineering",
-            "Head of Talent",
-            "Director",
-            "Director of Engineering",
-            "Head of Engineering",
-            "VP of Engineering",
-            "Engineering Director",
-            "Talent Director",
-            "Director of Talent",
-        ],
-        "large": [
-            # 100+ employees: Individual Contributors (Recruiters)
-            "Recruiter",
-            "Talent Acquisition",
-            "Technical Recruiter",
-            "Senior Recruiter",
-            "Talent Acquisition Specialist",
-            "Recruiting Coordinator",
-            "Talent Sourcer",
-            "Technical Talent Acquisition",
-        ],
-        "unknown": [
-            # Fallback - try decision makers first
-            "Founder",
-            "CTO",
-            "CEO",
-            "VP Engineering",
-            "Head of Talent",
-            "Director",
-        ]
-    }
-    
-    return role_priorities.get(size, role_priorities["unknown"])
+    return ROLE_PRIORITIES_BY_SIZE.get(size, ROLE_PRIORITIES_BY_SIZE["unknown"])
 
 
-def analyze_company_from_apollo(company_data: Dict[str, Any]) -> Dict[str, Any]:
+def analyze_company(company_data: Dict[str, Any]) -> Dict[str, Any]:
     """
-    Analyze company using Apollo data and return prioritized roles.
-    
-    Args:
-        company_data: Company data from Apollo search_company_by_domain()
-    
-    Returns:
-        Analysis with size, employee count, and prioritized roles
+    Analyze company data and return outreach role strategy.
     """
     employee_count = company_data.get("employee_count")
     size = categorize_company_size(employee_count)
     prioritized_roles = get_prioritized_roles_by_size(employee_count)
-    
+
     return {
         "company_name": company_data.get("name"),
         "employee_count": employee_count,
         "size_category": size,
         "prioritized_roles": prioritized_roles,
         "strategy": {
-            "small": "Target decision makers (CTO, Founders) - they make hiring decisions directly",
-            "medium": "Target hiring managers (Lead/Senior Engineers) - they evaluate candidates",
-            "large": "Target recruiters (Talent Acquisition) - they source and screen candidates",
-            "unknown": "Target decision makers (fallback strategy)"
-        }.get(size, "Target decision makers")
+            "small_1_10": "Prefer founders/CTO for direct startup decision-makers.",
+            "mid_11_50": "Prefer CTO/VP/engineering leaders and project leads.",
+            "large_50_plus": "Prefer technical recruiters and hiring managers first.",
+            "unknown": "Prefer technical decision-makers, then engineering managers.",
+        }.get(size, "Prefer technical decision-makers."),
     }
+
+
+def score_contact(title: Optional[str], prioritized_roles: List[str]) -> int:
+    """
+    Score a contact title against prioritized role targets.
+    Higher score means better fit.
+    """
+    if not title:
+        return 0
+
+    normalized_title = title.lower()
+    score = 0
+
+    for idx, role in enumerate(prioritized_roles):
+        role_lower = role.lower()
+        if role_lower in normalized_title:
+            # Earlier role in priority list receives higher weight.
+            score = max(score, len(prioritized_roles) - idx)
+
+    return score
+
+
+def role_priority_config() -> Dict[str, List[str]]:
+    """
+    Expose role-priority config so callers can adjust behavior easily.
+    """
+    return ROLE_PRIORITIES_BY_SIZE

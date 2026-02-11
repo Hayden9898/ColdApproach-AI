@@ -1,23 +1,24 @@
-from fastapi import APIRouter
-
-from app.utils.generate import generate_prompt, get_openai_response
+from fastapi import APIRouter, HTTPException
 from app.utils.scraper import scrape_company
 
 router = APIRouter(prefix="/scrape", tags=["scrape"])
 
 @router.get("/")
 def scrape_url(url: str):
+    """
+    Pure company webpage scrape endpoint.
+    No OpenAI call is made here.
+    """
     result = scrape_company(url)
-    if result == "Error":
-        return {"Error": "Failed to scrape company"}
-    if result["blocked"] == True:
-        #Use another method to scrape
-        pass
-    else:
-        prompt = generate_prompt(result)
-        response = get_openai_response(result)
-        print(response)
+    if not isinstance(result, dict):
+        raise HTTPException(status_code=500, detail="Failed to scrape company.")
 
-        return {"Company Data": result, "prompt": prompt, "email_body": response}
+    if result.get("error"):
+        raise HTTPException(status_code=500, detail=f"Scrape failed: {result['error']}")
 
+    return {
+        "success": True,
+        "company_data": result,
+        "note": "Scrape-only response (no LLM generation).",
+    }
 
