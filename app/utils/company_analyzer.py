@@ -7,11 +7,11 @@ from typing import Any, Dict, List, Optional
 ROLE_PRIORITIES_BY_SIZE = {
     # Smaller startups: decision makers can hire directly.
     "small_1_10": [
+        "CEO",
+        "CTO",
         "Co-Founder",
         "Cofounder",
         "Founder",
-        "CTO",
-        "CEO",
         "Technical Co-Founder",
         "Founding Engineer",
         "Head of Engineering",
@@ -35,6 +35,7 @@ ROLE_PRIORITIES_BY_SIZE = {
         "Talent Acquisition",
         "Senior Recruiter",
         "Recruiter",
+        "Talent",
         "Hiring Manager",
         "Engineering Manager",
         "Director of Engineering",
