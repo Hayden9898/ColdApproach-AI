@@ -3,7 +3,7 @@ Hunter pipeline: fetch contact candidates, rank by role fit, and return best can
 """
 from fastapi import APIRouter, HTTPException
 from app.utils.company_analyzer import analyze_company, role_priority_config, score_contact
-from app.utils.hunter_client import company_enrichment, domain_search
+from app.utils.hunter_client import company_enrichment, domain_search, normalize_domain
 
 router = APIRouter(prefix="/company", tags=["company"])
 
@@ -17,9 +17,26 @@ def find_contacts(company: str, limit: int = 10):
     3. Score role-fit and choose best candidate
     4. Return all fetched contacts and selected best candidate
     """
-    normalized_limit = max(1, min(limit, 10))
+    company_input = company.strip()
+    if not company_input:
+        raise HTTPException(status_code=400, detail="`company` is required and cannot be empty.")
 
-    search_result = domain_search(company=company, limit=normalized_limit)
+    if limit < 1 or limit > 10:
+        raise HTTPException(status_code=400, detail="`limit` must be between 1 and 10.")
+
+    # Guard malformed URL/domain inputs before spending Hunter credits.
+    looks_like_url_or_domain = any(x in company_input for x in ["://", "/", "."]) or company_input.startswith("www.")
+    if looks_like_url_or_domain:
+        domain_candidate = normalize_domain(company_input)
+        if not domain_candidate or "." not in domain_candidate:
+            raise HTTPException(
+                status_code=400,
+                detail="Invalid company URL/domain. Example valid input: https://acme.com or acme.com",
+            )
+
+    normalized_limit = limit
+
+    search_result = domain_search(company=company_input, limit=normalized_limit)
     if not search_result.get("success"):
         raise HTTPException(
             status_code=404,
