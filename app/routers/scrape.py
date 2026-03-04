@@ -1,18 +1,13 @@
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
-from typing import Optional
 
+from app.models.schemas import GenerateEmailRequest
 from app.utils.scraper import scrape_company
 from app.utils.generate import get_openai_response
 from app.utils.hunter_client import domain_search, company_enrichment, normalize_domain
 from app.utils.company_analyzer import analyze_company, score_contact
+from app.utils.resume_store import get_resume
 
 router = APIRouter(prefix="/scrape", tags=["scrape"])
-
-
-class GenerateEmailRequest(BaseModel):
-    url: str
-    resume_profile: Optional[dict] = None
 
 
 @router.get("/")
@@ -39,11 +34,29 @@ def scrape_url(url: str):
 def generate_email(request: GenerateEmailRequest):
     """
     Full pipeline: scrape website + lookup contacts via Hunter + generate personalized email.
+    Supports two modes:
+        - "template" (default): fill user-provided template with context data
+        - "ml": fully GPT-generated email (not yet available)
     Returns an SES-ready response with subject, body, and recipient info.
     """
+    # Mode guard — ML is locked for now
+    if request.mode == "ml":
+        raise HTTPException(status_code=400, detail="ML mode is not yet available.")
+
     url = request.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="URL is required.")
+
+    if request.mode == "template" and not request.template:
+        raise HTTPException(status_code=400, detail="Template is required when using template mode.")
+
+    # Resolve resume_id → resume_profile if provided
+    resume_profile = request.resume_profile
+    if request.resume_id:
+        stored = get_resume(request.resume_id)
+        if not stored:
+            raise HTTPException(status_code=404, detail="Resume not found. Upload again via /resume/upload.")
+        resume_profile = stored["profile"]
 
     # 1. Scrape the company website for content
     scraped_data = scrape_company(url)
@@ -115,8 +128,13 @@ def generate_email(request: GenerateEmailRequest):
     email_result = get_openai_response(
         scraped_data=scraped_data,
         company_data=company_data,
-        resume_data=request.resume_profile,
+        resume_data=resume_profile,
         contact_data=best_contact,
+        mode=request.mode,
+        template=request.template,
+        subject_template=request.subject_template,
+        linkedin_url=request.linkedin_url,
+        github_url=request.github_url,
     )
 
     # 4. Build SES-ready response

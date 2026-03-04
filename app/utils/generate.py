@@ -1,4 +1,4 @@
-from typing import Any, Dict, Optional
+from typing import Any, Dict, List, Optional
 
 
 def get_client():
@@ -10,15 +10,19 @@ def get_client():
     return OpenAI()
 
 
-def generate_prompt(
+# ---------------------------------------------------------------------------
+# Context builder (shared by all generation modes)
+# ---------------------------------------------------------------------------
+
+def _build_context_sections(
     scraped_data: Dict[str, Any],
     company_data: Optional[Dict[str, Any]] = None,
     resume_data: Optional[Dict[str, Any]] = None,
     contact_data: Optional[Dict[str, Any]] = None,
-) -> str:
+) -> List[str]:
     """
-    Build a structured prompt from scraped website data, Hunter company data,
-    the user's resume profile, and the target contact.
+    Build context sections from all data sources.
+    Returns a list of section strings (joined later by each prompt builder).
     """
     url = scraped_data.get("url", "Unknown URL")
     blocked = scraped_data.get("blocked")
@@ -29,7 +33,7 @@ def generate_prompt(
     summary_keywords = scraped_data.get("summary_keywords") or []
     error = scraped_data.get("error")
 
-    sections = [f"Company URL: {url}"]
+    sections: List[str] = [f"Company URL: {url}"]
 
     if blocked is True:
         sections.append(
@@ -94,7 +98,6 @@ def generate_prompt(
 
         skills = resume_data.get("skills") or []
         if skills:
-            # Cross-reference with company keywords for relevance
             company_kw_lower = {kw.lower() for kw in summary_keywords}
             matching = [s for s in skills if s.lower() in company_kw_lower]
             other = [s for s in skills if s.lower() not in company_kw_lower]
@@ -123,6 +126,25 @@ def generate_prompt(
 
         if resume_parts:
             sections.append("--- Sender Profile (your resume) ---\n" + "\n".join(resume_parts))
+
+    return sections
+
+
+# ---------------------------------------------------------------------------
+# From-scratch prompt (existing behaviour, future ML mode foundation)
+# ---------------------------------------------------------------------------
+
+def generate_prompt(
+    scraped_data: Dict[str, Any],
+    company_data: Optional[Dict[str, Any]] = None,
+    resume_data: Optional[Dict[str, Any]] = None,
+    contact_data: Optional[Dict[str, Any]] = None,
+) -> str:
+    """
+    Build a structured prompt from scraped website data, Hunter company data,
+    the user's resume profile, and the target contact.
+    """
+    sections = _build_context_sections(scraped_data, company_data, resume_data, contact_data)
 
     # --- Final instructions ---
     tone_note = ""
@@ -161,6 +183,96 @@ def generate_prompt(
     return "\n\n".join(sections)
 
 
+# ---------------------------------------------------------------------------
+# Template helpers
+# ---------------------------------------------------------------------------
+
+def _fill_deterministic_placeholders(
+    template: str,
+    company_data: Optional[Dict[str, Any]] = None,
+    contact_data: Optional[Dict[str, Any]] = None,
+    resume_data: Optional[Dict[str, Any]] = None,
+    linkedin_url: Optional[str] = None,
+    github_url: Optional[str] = None,
+) -> str:
+    """
+    First pass: replace placeholders that have exact known values.
+    Leaves contextual placeholders (e.g. [specific company detail]) for GPT.
+    """
+    filled = template
+
+    # Company Name
+    company_name = ""
+    if company_data and company_data.get("name"):
+        company_name = company_data["name"]
+    filled = filled.replace("[Company Name]", company_name)
+
+    # Contact First Name
+    first_name = ""
+    if contact_data and contact_data.get("name"):
+        first_name = contact_data["name"].split()[0]
+    filled = filled.replace("[First Name]", first_name)
+
+    # Sender Name
+    sender_name = ""
+    if resume_data and resume_data.get("name"):
+        sender_name = resume_data["name"]
+    filled = filled.replace("[Sender Name]", sender_name)
+
+    # LinkedIn
+    linkedin = linkedin_url or ""
+    if not linkedin and resume_data and resume_data.get("linkedin"):
+        linkedin = resume_data["linkedin"]
+        if not linkedin.startswith("http"):
+            linkedin = f"https://{linkedin}"
+    filled = filled.replace("[LinkedIn]", linkedin)
+
+    # GitHub
+    github = github_url or ""
+    if not github and resume_data and resume_data.get("github"):
+        github = resume_data["github"]
+        if not github.startswith("http"):
+            github = f"https://{github}"
+    filled = filled.replace("[GitHub]", github)
+
+    return filled
+
+
+def generate_template_prompt(
+    pre_filled_template: str,
+    scraped_data: Dict[str, Any],
+    company_data: Optional[Dict[str, Any]] = None,
+    resume_data: Optional[Dict[str, Any]] = None,
+    contact_data: Optional[Dict[str, Any]] = None,
+) -> str:
+    """
+    Build a prompt that instructs GPT to fill contextual placeholders
+    in a pre-filled template using the scraped/company/resume context.
+    """
+    sections = _build_context_sections(scraped_data, company_data, resume_data, contact_data)
+
+    sections.append(
+        "You have been given a partially filled email template below. "
+        "Your job is to fill in the remaining bracketed placeholders "
+        "(like [specific company detail], [company focus area], [resume highlights - bullet points]) "
+        "using the context data provided above.\n\n"
+        "Rules:\n"
+        "- Replace each bracketed placeholder with specific, relevant content from the context\n"
+        "- For [resume highlights - bullet points], create concise bullet points from the sender's experience\n"
+        "- Keep the template's tone and structure exactly as written\n"
+        "- Do NOT add content outside the placeholders\n"
+        "- Do NOT remove or rearrange any part of the template\n"
+        "- Return the completed email body only — no extra formatting or labels\n\n"
+        f"--- Template to fill ---\n{pre_filled_template}"
+    )
+
+    return "\n\n".join(sections)
+
+
+# ---------------------------------------------------------------------------
+# Response parsing
+# ---------------------------------------------------------------------------
+
 def _parse_subject_body(raw_text: str) -> Dict[str, str]:
     """
     Parse the LLM response into subject and body using the SUBJECT:/BODY: format.
@@ -184,31 +296,59 @@ def _parse_subject_body(raw_text: str) -> Dict[str, str]:
     return {"subject": subject, "body": body}
 
 
+# ---------------------------------------------------------------------------
+# Main generation entry point
+# ---------------------------------------------------------------------------
+
 def get_openai_response(
     scraped_data: Dict[str, Any],
     company_data: Optional[Dict[str, Any]] = None,
     resume_data: Optional[Dict[str, Any]] = None,
     contact_data: Optional[Dict[str, Any]] = None,
+    mode: str = "template",
+    template: Optional[str] = None,
+    subject_template: Optional[str] = None,
+    linkedin_url: Optional[str] = None,
+    github_url: Optional[str] = None,
 ) -> Dict[str, str]:
     """
-    Generate a personalized cold email using GPT-5-nano.
+    Generate a personalized cold email using GPT.
     Returns {"subject": str, "body": str}.
+
+    Modes:
+        "template" — fill user-provided template with context data (default)
+        "ml"       — fully GPT-generated email (locked, not yet available)
     """
     client = get_client()
 
-    prompt = generate_prompt(scraped_data, company_data, resume_data, contact_data)
+    if mode == "template" and template:
+        # Pass 1: deterministic replacements
+        pre_filled = _fill_deterministic_placeholders(
+            template, company_data, contact_data, resume_data,
+            linkedin_url, github_url,
+        )
+
+        # Pass 2: GPT fills contextual placeholders
+        prompt = generate_template_prompt(
+            pre_filled, scraped_data, company_data, resume_data, contact_data
+        )
+        system_msg = (
+            "You fill in email templates by replacing bracketed placeholders "
+            "with specific, relevant content. Preserve the template structure exactly."
+        )
+    else:
+        # From-scratch generation (future ML mode foundation)
+        prompt = generate_prompt(scraped_data, company_data, resume_data, contact_data)
+        system_msg = (
+            "You write short, personalized cold outreach emails for software engineers. "
+            "Every email must reference specific details about the company and the sender's background. "
+            "Never write generic templates."
+        )
 
     response = client.responses.create(
         model="gpt-5-nano",
         input=[
-            {
-                "role": "system",
-                "content": (
-                    "You write short, personalized cold outreach emails for software engineers. "
-                    "Every email must reference specific details about the company and the sender's background. "
-                    "Never write generic templates."
-                ),
-            },
+            {"role": "system", "content": system_msg},
             {"role": "user", "content": prompt},
         ],
     )
@@ -227,4 +367,17 @@ def get_openai_response(
     if not raw_text:
         raise RuntimeError("No text found in OpenAI response.")
 
-    return _parse_subject_body(raw_text)
+    if mode == "template" and template:
+        # Template mode: body is the raw GPT output, subject from template or default
+        subject = ""
+        if subject_template:
+            subject = _fill_deterministic_placeholders(
+                subject_template, company_data, contact_data, resume_data,
+                linkedin_url, github_url,
+            )
+        else:
+            company_name = (company_data or {}).get("name", "your company")
+            subject = f"Contributing to {company_name}'s mission"
+        return {"subject": subject, "body": raw_text.strip()}
+    else:
+        return _parse_subject_body(raw_text)

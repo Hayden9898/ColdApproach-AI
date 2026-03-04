@@ -3,6 +3,7 @@ from typing import Dict
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.utils.resume_parser import extract_resume_text, format_resume, is_resume
+from app.utils.resume_store import save_resume
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
@@ -44,10 +45,14 @@ async def upload_resume(file: UploadFile = File(...)) -> Dict:
         
         # Step 3: Format resume into structured data
         structured_data = format_resume(resume_text)
-        
+
+        # Step 4: Save PDF bytes + parsed profile in-memory
+        resume_id = save_resume(file_bytes, structured_data)
+
         # Return session-based profile
         return {
             "success": True,
+            "resume_id": resume_id,
             "raw_text": resume_text,  # Keep for debugging/reference
             "profile": {
                 **structured_data,
