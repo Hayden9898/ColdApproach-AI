@@ -1,7 +1,7 @@
 # Pydantic schemas/models
 
 from datetime import datetime
-from typing import Optional
+from typing import Dict, List, Optional
 
 from pydantic import BaseModel, field_validator
 
@@ -52,3 +52,38 @@ class SendEmailResponse(BaseModel):
 
 class SESVerifyRequest(BaseModel):
     email: str
+
+
+# ---------------------------------------------------------------------------
+# Batch processing
+# ---------------------------------------------------------------------------
+
+BATCH_LIMIT = 20
+
+class BatchSubmitRequest(BaseModel):
+    urls: List[str]                            # company URLs (max 20)
+    from_email: str                            # sender email (determines provider)
+    resume_id: Optional[str] = None
+    resume_profile: Optional[dict] = None
+    mode: str = "template"
+    template: Optional[str] = None
+    subject_template: Optional[str] = None
+    linkedin_url: Optional[str] = None
+    github_url: Optional[str] = None
+    send_at: Optional[datetime] = None         # None = send after generation, set = schedule all
+
+    @field_validator("send_at", mode="before")
+    @classmethod
+    def empty_string_to_none(cls, v):
+        if v == "":
+            return None
+        return v
+
+
+class BatchStatusResponse(BaseModel):
+    job_id: str
+    status: str                                # queued | processing | completed | failed
+    total: int
+    completed: int
+    failed: int
+    results: Dict
