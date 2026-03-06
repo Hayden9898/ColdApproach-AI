@@ -31,6 +31,7 @@ class SendEmailRequest(BaseModel):
     subject: str
     body: str
     reply_to: Optional[str] = None
+    html_body: Optional[str] = None            # HTML version of the email body
     send_at: Optional[datetime] = None         # None = instant, set = scheduled (UTC)
 
     @field_validator("send_at", mode="before")

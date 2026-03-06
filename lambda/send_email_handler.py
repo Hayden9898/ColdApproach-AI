@@ -30,13 +30,16 @@ def handler(event, context):
 
     # Send immediately (no send_at)
     send_url = f"{API_BASE_URL}/send/email"
-    send_body = json.dumps({
+    send_payload = {
         "from_email": email_data["from_email"],
         "to_email": email_data["to_email"],
         "subject": email_data["subject"],
         "body": email_data["body"],
         "reply_to": email_data.get("reply_to"),
-    }).encode()
+    }
+    if email_data.get("html_body"):
+        send_payload["html_body"] = email_data["html_body"]
+    send_body = json.dumps(send_payload).encode()
 
     send_req = urllib.request.Request(
         send_url,

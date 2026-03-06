@@ -39,11 +39,13 @@ def _process_message(message: dict) -> None:
 
         # Resolve resume
         resume_profile = body.get("resume_profile")
+        resume_file_bytes = None
         resume_id = body.get("resume_id")
         if resume_id:
             stored = get_resume(resume_id)
             if stored:
                 resume_profile = stored["profile"]
+                resume_file_bytes = stored.get("file_bytes")
 
         # 1. Scrape
         scraped_data = scrape_company(url)
@@ -122,7 +124,28 @@ def _process_message(message: dict) -> None:
             github_url=body.get("github_url"),
         )
 
-        # 4. Send or schedule
+        # 4. Build HTML email and attachments
+        from app.utils.html_builder import (
+            markdown_to_html,
+            wrap_html_email,
+            build_plain_text_fallback,
+        )
+
+        linkedin = email_result.get("linkedin_url", "")
+        github = email_result.get("github_url", "")
+        sender_name = (resume_profile or {}).get("name", "")
+
+        body_html = markdown_to_html(email_result["body"])
+        html_body = wrap_html_email(body_html, linkedin, github, sender_name)
+        plain_body = build_plain_text_fallback(email_result["body"], linkedin, github)
+
+        # Build attachments list
+        attachments = []
+        if resume_file_bytes:
+            safe_name = sender_name.replace(" ", "_") if sender_name else "Resume"
+            attachments.append((f"{safe_name}_Resume.pdf", resume_file_bytes, "application/pdf"))
+
+        # 5. Send or schedule
         from_email = body["from_email"]
         to_email = best_contact["email"] if best_contact else None
 
@@ -130,6 +153,7 @@ def _process_message(message: dict) -> None:
             "email": {
                 "subject": email_result["subject"],
                 "body": email_result["body"],
+                "html_body": html_body,
                 "to_email": to_email,
                 "to_name": best_contact["name"] if best_contact else None,
             },
@@ -154,7 +178,8 @@ def _process_message(message: dict) -> None:
                 "from_email": from_email,
                 "to_email": to_email,
                 "subject": email_result["subject"],
-                "body": email_result["body"],
+                "body": plain_body,
+                "html_body": html_body,
             })
 
             send_time = datetime.fromisoformat(send_at)
@@ -174,7 +199,9 @@ def _process_message(message: dict) -> None:
                 from_email=from_email,
                 to_email=to_email,
                 subject=email_result["subject"],
-                body=email_result["body"],
+                body=plain_body,
+                html_body=html_body,
+                attachments=attachments or None,
             )
 
             if send_result["success"]:

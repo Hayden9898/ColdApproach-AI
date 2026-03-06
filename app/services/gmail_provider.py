@@ -5,8 +5,11 @@ Sends email as the authenticated user — appears in their Sent folder.
 
 import base64
 import os
+from email.mime.base import MIMEBase
+from email.mime.multipart import MIMEMultipart
 from email.mime.text import MIMEText
-from typing import Any, Dict, Optional
+from email import encoders
+from typing import Any, Dict, List, Optional, Tuple
 
 from app.services.email_provider import EmailProvider
 from app.utils.token_store import get_token, save_token
@@ -54,11 +57,35 @@ class GmailProvider(EmailProvider):
         subject: str,
         body: str,
         reply_to: Optional[str] = None,
+        html_body: Optional[str] = None,
+        attachments: Optional[List[Tuple[str, bytes, str]]] = None,
     ) -> Dict[str, Any]:
         try:
             service = self._get_gmail_service(from_email)
 
-            message = MIMEText(body)
+            if html_body and attachments:
+                # HTML + attachments → mixed with alternative inside
+                message = MIMEMultipart("mixed")
+                alt = MIMEMultipart("alternative")
+                alt.attach(MIMEText(body, "plain"))
+                alt.attach(MIMEText(html_body, "html"))
+                message.attach(alt)
+                for filename, file_bytes, mime_type in attachments:
+                    maintype, subtype = mime_type.split("/", 1)
+                    part = MIMEBase(maintype, subtype)
+                    part.set_payload(file_bytes)
+                    encoders.encode_base64(part)
+                    part.add_header("Content-Disposition", "attachment", filename=filename)
+                    message.attach(part)
+            elif html_body:
+                # HTML + plain text, no attachments → alternative
+                message = MIMEMultipart("alternative")
+                message.attach(MIMEText(body, "plain"))
+                message.attach(MIMEText(html_body, "html"))
+            else:
+                # Plain text only — unchanged
+                message = MIMEText(body)
+
             message["to"] = to_email
             message["from"] = from_email
             message["subject"] = subject

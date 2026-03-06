@@ -187,6 +187,27 @@ def generate_prompt(
 # Template helpers
 # ---------------------------------------------------------------------------
 
+def _resolve_link_urls(
+    resume_data: Optional[Dict[str, Any]] = None,
+    linkedin_url: Optional[str] = None,
+    github_url: Optional[str] = None,
+) -> Dict[str, str]:
+    """Resolve final LinkedIn and GitHub URLs from explicit args or resume data."""
+    linkedin = linkedin_url or ""
+    if not linkedin and resume_data and resume_data.get("linkedin"):
+        linkedin = resume_data["linkedin"]
+        if not linkedin.startswith("http"):
+            linkedin = f"https://{linkedin}"
+
+    github = github_url or ""
+    if not github and resume_data and resume_data.get("github"):
+        github = resume_data["github"]
+        if not github.startswith("http"):
+            github = f"https://{github}"
+
+    return {"linkedin_url": linkedin, "github_url": github}
+
+
 def _fill_deterministic_placeholders(
     template: str,
     company_data: Optional[Dict[str, Any]] = None,
@@ -194,10 +215,14 @@ def _fill_deterministic_placeholders(
     resume_data: Optional[Dict[str, Any]] = None,
     linkedin_url: Optional[str] = None,
     github_url: Optional[str] = None,
+    strip_link_placeholders: bool = False,
 ) -> str:
     """
     First pass: replace placeholders that have exact known values.
     Leaves contextual placeholders (e.g. [specific company detail]) for GPT.
+
+    When strip_link_placeholders=True, removes [LinkedIn] and [GitHub]
+    placeholders from the body entirely (links go in the HTML footer instead).
     """
     filled = template
 
@@ -219,21 +244,22 @@ def _fill_deterministic_placeholders(
         sender_name = resume_data["name"]
     filled = filled.replace("[Sender Name]", sender_name)
 
-    # LinkedIn
-    linkedin = linkedin_url or ""
-    if not linkedin and resume_data and resume_data.get("linkedin"):
-        linkedin = resume_data["linkedin"]
-        if not linkedin.startswith("http"):
-            linkedin = f"https://{linkedin}"
-    filled = filled.replace("[LinkedIn]", linkedin)
+    # LinkedIn / GitHub
+    urls = _resolve_link_urls(resume_data, linkedin_url, github_url)
 
-    # GitHub
-    github = github_url or ""
-    if not github and resume_data and resume_data.get("github"):
-        github = resume_data["github"]
-        if not github.startswith("http"):
-            github = f"https://{github}"
-    filled = filled.replace("[GitHub]", github)
+    if strip_link_placeholders:
+        # Remove placeholders and surrounding link-intro text
+        import re
+        filled = filled.replace("[LinkedIn]", "")
+        filled = filled.replace("[GitHub]", "")
+        # Clean up lines like "Here are my links:" or "Links:" left empty
+        filled = re.sub(r"(?m)^.*(?:links?|profiles?)\s*:?\s*\|\s*$", "", filled, flags=re.IGNORECASE)
+        filled = re.sub(r"(?m)^.*(?:links?|profiles?)\s*:?\s*$", "", filled, flags=re.IGNORECASE)
+        # Collapse excessive blank lines left behind
+        filled = re.sub(r"\n{3,}", "\n\n", filled)
+    else:
+        filled = filled.replace("[LinkedIn]", urls["linkedin_url"])
+        filled = filled.replace("[GitHub]", urls["github_url"])
 
     return filled
 
@@ -258,7 +284,9 @@ def generate_template_prompt(
         "using the context data provided above.\n\n"
         "Rules:\n"
         "- Replace each bracketed placeholder with specific, relevant content from the context\n"
-        "- For [resume highlights - bullet points], create concise bullet points from the sender's experience\n"
+        "- For [resume highlights - bullet points], create concise bullet points prefixed with `- ` (one per line)\n"
+        "- Wrap key metrics and numbers in **double asterisks** (e.g. **$1.6M+**, **83%**, **10k+ sessions**)\n"
+        "- Do NOT include LinkedIn/GitHub URLs in the body — they are added separately\n"
         "- Keep the template's tone and structure exactly as written\n"
         "- Do NOT add content outside the placeholders\n"
         "- Do NOT remove or rearrange any part of the template\n"
@@ -321,11 +349,15 @@ def get_openai_response(
     """
     client = get_client()
 
+    # Resolve link URLs once for use in return value and placeholder stripping
+    resolved_urls = _resolve_link_urls(resume_data, linkedin_url, github_url)
+
     if mode == "template" and template:
-        # Pass 1: deterministic replacements
+        # Pass 1: deterministic replacements (strip links — they go in HTML footer)
         pre_filled = _fill_deterministic_placeholders(
             template, company_data, contact_data, resume_data,
             linkedin_url, github_url,
+            strip_link_placeholders=True,
         )
 
         # Pass 2: GPT fills contextual placeholders
@@ -378,6 +410,12 @@ def get_openai_response(
         else:
             company_name = (company_data or {}).get("name", "your company")
             subject = f"Contributing to {company_name}'s mission"
-        return {"subject": subject, "body": raw_text.strip()}
+        return {
+            "subject": subject,
+            "body": raw_text.strip(),
+            **resolved_urls,
+        }
     else:
-        return _parse_subject_body(raw_text)
+        result = _parse_subject_body(raw_text)
+        result.update(resolved_urls)
+        return result

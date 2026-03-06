@@ -3,6 +3,7 @@ from fastapi import APIRouter, HTTPException
 from app.models.schemas import GenerateEmailRequest
 from app.utils.scraper import scrape_company
 from app.utils.generate import get_openai_response
+from app.utils.html_builder import markdown_to_html, wrap_html_email, build_plain_text_fallback
 from app.utils.hunter_client import domain_search, company_enrichment, normalize_domain
 from app.utils.company_analyzer import analyze_company, score_contact
 from app.utils.resume_store import get_resume
@@ -137,11 +138,20 @@ def generate_email(request: GenerateEmailRequest):
         github_url=request.github_url,
     )
 
-    # 4. Build SES-ready response
+    # 4. Build HTML version for preview
+    linkedin = email_result.get("linkedin_url", "")
+    github = email_result.get("github_url", "")
+    sender_name = (resume_profile or {}).get("name", "")
+
+    body_html = markdown_to_html(email_result["body"])
+    html_body = wrap_html_email(body_html, linkedin, github, sender_name)
+
+    # 5. Build SES-ready response
     response = {
         "email": {
             "subject": email_result["subject"],
             "body": email_result["body"],
+            "html_body": html_body,
             "to_email": best_contact["email"] if best_contact else None,
             "to_name": best_contact["name"] if best_contact else None,
         },

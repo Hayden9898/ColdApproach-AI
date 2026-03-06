@@ -50,6 +50,7 @@ def send_email(request: SendEmailRequest):
             "subject": request.subject,
             "body": request.body,
             "reply_to": request.reply_to,
+            "html_body": request.html_body,
         })
 
         from app.services.scheduler import create_schedule
@@ -82,6 +83,7 @@ def send_email(request: SendEmailRequest):
         subject=request.subject,
         body=request.body,
         reply_to=request.reply_to,
+        html_body=request.html_body,
     )
 
     if not result["success"]:
