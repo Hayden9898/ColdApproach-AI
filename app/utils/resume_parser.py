@@ -103,6 +103,7 @@ def format_resume(resume_text: str) -> Dict[str, any]:
         "github": None,
         "skills": [],
         "experience": [],
+        "projects": [],
         "education": [],
         "summary": None
     }
@@ -160,6 +161,11 @@ def format_resume(resume_text: str) -> Dict[str, any]:
     if exp_section:
         formatted["experience"] = _extract_experience(exp_section)
     
+    # Extract projects
+    proj_section = _find_section(sections, ['projects', 'personal projects', 'side projects', 'academic projects'])
+    if proj_section:
+        formatted["projects"] = _extract_projects(proj_section)
+
     # Extract education
     edu_section = _find_section(sections, ['education', 'academic', 'qualifications'])
     if edu_section:
@@ -400,6 +406,131 @@ def _extract_experience(exp_text: str) -> List[Dict[str, str]]:
         experiences.append(current_exp)
     
     return experiences[:10]  # Limit to top 10 experiences
+
+
+# Matches mid-line separators: |, em dash, en dash, double hyphen, spaced single hyphen
+_PROJECT_SEP = re.compile(r'\s*[|—–]\s*|\s+--\s+|\s+-\s+')
+# Matches parenthesized tech: "Project Name (React, Node.js, AWS)"
+_PAREN_TECH = re.compile(r'^(.+?)\s*\(([^)]*,[^)]*)\)\s*$')
+
+# Action verbs that start description/bullet lines — NOT project headers
+_ACTION_VERBS = {
+    'built', 'developed', 'implemented', 'architected', 'integrated',
+    'designed', 'created', 'engineered', 'deployed', 'optimized',
+    'reduced', 'improved', 'automated', 'configured', 'established',
+    'led', 'managed', 'maintained', 'migrated', 'refactored',
+    'utilized', 'leveraged', 'performed', 'achieved', 'increased',
+    'wrote', 'launched', 'coordinated', 'spearheaded', 'streamlined',
+    'collaborated', 'contributed', 'delivered', 'devised', 'executed',
+    'generated', 'handled', 'initiated', 'resolved', 'secured',
+    'trained', 'tested', 'published', 'presented', 'analyzed',
+    'boosted', 'cut', 'eliminated', 'enhanced', 'ensured',
+    'expanded', 'extracted', 'fixed', 'founded', 'introduced',
+    'overhauled', 'pioneered', 'processed', 'proposed', 'scaled',
+    'simplified', 'supervised', 'supported', 'transformed', 'upgraded',
+    'safeguarded', 'shifted', 'co-authored',
+}
+
+
+def _is_description_line(line: str) -> bool:
+    """Check if a line reads like a description (starts with an action verb)."""
+    first_word = line.split()[0].lower().rstrip('ed,s') if line.split() else ''
+    return line.split()[0].lower() in _ACTION_VERBS if line.split() else False
+
+
+def _looks_like_tech_stack(text: str) -> bool:
+    """Check if text looks like a comma-separated tech stack (not a sentence)."""
+    items = [item.strip() for item in text.split(',')]
+    return len(items) >= 2 and all(len(item) < 30 for item in items)
+
+
+def _save_project(projects, current_proj, current_bullets):
+    """Save current project to the list if it has a name."""
+    if current_proj and current_proj.get('name'):
+        if current_bullets:
+            current_proj['description'].extend(current_bullets)
+        projects.append(current_proj)
+
+
+def _split_name_tech(text: str):
+    """Split a header line into (name, technologies) using adaptive separators."""
+    # Try mid-line separator (|, —, –, --, spaced -)
+    sep_match = _PROJECT_SEP.search(text)
+    if sep_match:
+        name = text[:sep_match.start()].strip()
+        tech = text[sep_match.end():].strip()
+        return name, tech
+
+    # Try parenthesized tech: "Name (React, Node.js)"
+    paren_match = _PAREN_TECH.match(text)
+    if paren_match:
+        return paren_match.group(1).strip(), paren_match.group(2).strip()
+
+    return text, ""
+
+
+def _extract_projects(proj_text: str) -> List[Dict[str, str]]:
+    """Extract project entries from the projects section.
+
+    Uses pattern recognition: description lines start with action verbs
+    (Built, Developed, Implemented...), project headers don't.
+    Any non-bullet, non-description line is treated as a new project header.
+    Tech stack is then extracted from the header via separators (|, —, –, etc).
+    """
+    projects = []
+    lines = proj_text.split('\n')
+
+    current_proj = {}
+    current_bullets = []
+
+    for line in lines:
+        line = line.strip()
+        if not line:
+            continue
+
+        # 1. Bullet point → accumulate
+        if line.startswith('•') or (line.startswith('-') and len(line) > 1 and line[1] == ' '):
+            bullet = line.lstrip('•').lstrip('-').strip()
+            if bullet:
+                current_bullets.append(bullet)
+            continue
+
+        # 2. Description line (starts with action verb) → accumulate
+        if _is_description_line(line):
+            current_bullets.append(line)
+            continue
+
+        # 3. Tech stack on its own line (belongs to current project)
+        if current_proj and current_proj.get('name') and not current_proj.get('technologies'):
+            if _looks_like_tech_stack(line):
+                current_proj['technologies'] = line
+                continue
+
+        # 4. Everything else → new project header
+        _save_project(projects, current_proj, current_bullets)
+
+        # Extract date if present
+        duration = ""
+        name_line = line
+        if _is_date_range(line):
+            date_match = re.search(
+                r'((Jan|Feb|Mar|Apr|May|Jun|Jul|Aug|Sep|Oct|Nov|Dec)[a-z]*\s+\d{4}|\d{4}\s*[-–—])',
+                line, re.IGNORECASE,
+            )
+            if date_match:
+                name_line = line[:date_match.start()].strip()
+                duration = line[date_match.start():].strip()
+
+        # Split name from tech stack
+        name, tech = _split_name_tech(name_line)
+
+        current_proj = {'name': name, 'technologies': tech, 'duration': duration, 'description': []}
+        current_bullets = []
+
+    # Save last project
+    _save_project(projects, current_proj, current_bullets)
+
+    return projects[:8]
 
 
 def _extract_education(edu_text: str) -> List[Dict[str, str]]:

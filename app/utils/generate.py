@@ -107,7 +107,7 @@ def _build_context_sections(
                 resume_parts.append(f"Other Skills: {', '.join(other[:10])}")
 
         experience = resume_data.get("experience") or []
-        for i, exp in enumerate(experience[:2]):
+        for i, exp in enumerate(experience[:4]):
             exp_title = exp.get("title", "")
             exp_company = exp.get("company", "")
             exp_duration = exp.get("duration", "")
@@ -116,6 +116,18 @@ def _build_context_sections(
             if bullets:
                 exp_str += "\n  " + "\n  ".join(bullets[:3])
             resume_parts.append(exp_str)
+
+        projects = resume_data.get("projects") or []
+        for i, proj in enumerate(projects[:5]):
+            proj_str = f"Project {i+1}: {proj.get('name', '')}"
+            if proj.get("technologies"):
+                proj_str += f" ({proj['technologies']})"
+            if proj.get("duration"):
+                proj_str += f" — {proj['duration']}"
+            bullets = proj.get("description") or []
+            if bullets:
+                proj_str += "\n  " + "\n  ".join(bullets[:3])
+            resume_parts.append(proj_str)
 
         education = resume_data.get("education") or []
         for edu in education[:1]:
@@ -168,7 +180,10 @@ def generate_prompt(
         "- Body: 4–6 sentences (under 120 words)\n"
         "- Start with a specific insight about the company's product, tech, or mission — not a generic compliment\n"
         + (
-            "- Connect at least one of the sender's skills or experiences to the company's work\n"
+            "- Connect the sender's most relevant skills or experiences to the company's work. "
+            "Prioritize more recent internships and work experience. "
+            "However, if a personal/academic project is exceptionally strong or directly relevant "
+            "to what this company builds, include it alongside the experience.\n"
             if resume_data
             else ""
         )
@@ -284,7 +299,10 @@ def generate_template_prompt(
         "using the context data provided above.\n\n"
         "Rules:\n"
         "- Replace each bracketed placeholder with specific, relevant content from the context\n"
-        "- For [resume highlights - bullet points], create concise bullet points prefixed with `- ` (one per line)\n"
+        "- For [resume highlights - bullet points], prioritize more recent internships and work experience. "
+        "If a project is exceptionally strong or directly relevant to the company's domain "
+        "(e.g., a financial tracker project when emailing a fintech company), include it as a supplementary highlight. "
+        "Create concise bullet points prefixed with `- ` (one per line)\n"
         "- Wrap key metrics and numbers in **double asterisks** (e.g. **$1.6M+**, **83%**, **10k+ sessions**)\n"
         "- Do NOT include LinkedIn/GitHub URLs in the body — they are added separately\n"
         "- Keep the template's tone and structure exactly as written\n"
