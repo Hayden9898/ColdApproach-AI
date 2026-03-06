@@ -15,7 +15,7 @@ async def upload_resume(file: UploadFile = File(...)) -> Dict:
     """
     Accept a PDF resume upload, extract raw text and structured data.
     Returns session-based profile data (not stored).
-    
+
     Flow:
     1. Extract raw text from PDF
     2. Extract structured data (name, email, skills, experience, etc.)
@@ -35,14 +35,14 @@ async def upload_resume(file: UploadFile = File(...)) -> Dict:
         # Step 1: Extract raw text
         text_result = extract_resume_text(file_bytes)
         resume_text = text_result.get("text")
-        
+
         # Step 2: Validate that it's actually a resume
         if not is_resume(resume_text):
             raise HTTPException(
                 status_code=400,
                 detail="File uploaded does not appear to be a resume. Please upload a valid resume PDF."
             )
-        
+
         # Step 3: Format resume into structured data
         structured_data = format_resume(resume_text)
 
@@ -59,7 +59,7 @@ async def upload_resume(file: UploadFile = File(...)) -> Dict:
                 "resume_text_length": len(resume_text)
             }
         }
-        
+
     except HTTPException:
         # Re-raise HTTP exceptions (like validation errors) as-is
         raise
@@ -70,4 +70,3 @@ async def upload_resume(file: UploadFile = File(...)) -> Dict:
             status_code=500,
             detail=f"Error processing resume: {str(exc)}"
         ) from exc
-
