@@ -1,143 +1,140 @@
-# 🧠 ColdReach AI
+# ColdReach AI
 
-**AI-powered outreach that values quality over quantity.**  
-ColdReach AI helps students, job seekers, and developers connect more effectively with **startups and professionals** by crafting authentic, personalized cold emails.  
-The system automatically scrapes company and user data, finds contact candidates using the Hunter API, ranks the best contact by role-fit, and uses a lightweight ML model to ensure every message feels specific, relevant, and human before it’s ever sent.
+**AI-powered cold email outreach that automates research, contact discovery, and personalized email generation.**
 
 ---
 
-## 🚀 Overview
+## Overview
 
-Connecting with startups and professionals can be difficult — researching companies, finding the right person, and writing personalized outreach messages takes hours.  
-Most “AI outreach” tools solve this by blasting generic templates.  
-ColdReach AI takes the opposite approach: it **automates the research and writing**, but adds an **ML quality gate** and **real contact discovery** to ensure every message is thoughtful, targeted, and worth sending.
+Connecting with startups and professionals is time-consuming — researching companies, finding the right person, and writing personalized outreach takes hours. Most "AI outreach" tools solve this by blasting generic templates.
 
----
+ColdReach AI takes the opposite approach: it automates the research and writing while keeping every message specific, relevant, and human. The system scrapes company data, discovers contacts via Hunter.io, ranks the best-fit person by role and company size, and generates a personalized cold email using your resume and a customizable template — all through a single API call.
 
-## 🔍 How It Works
-
-1. **User uploads their profile once:**
-   - Resume (PDF)
-   - LinkedIn URL
-   - GitHub URL  
-   ColdReach scrapes and summarizes these sources to understand the user’s skills, projects, and interests.  
-   This user profile is stored securely (e.g., in AWS S3 or a database) and reused for future generations unless the user requests an update.
-
-2. **User enters a company name or company link:**  
-   - ColdReach scrapes the company’s website (“About” page, meta tags, key paragraphs).  
-   - Summarizes what the company does and extracts relevant keywords.
-
-3. **Hunter API integration:**  
-   - ColdReach calls Hunter Domain Search and fetches up to 10 contact candidates for that company.  
-   - It evaluates titles/roles using company-size strategy (`1-10`, `11-50`, `50+`) and selects the best-fit candidate.
-   - The response includes the top candidates (with roles and emails) plus a `best_contact` recommendation.
-
-4. **GPT-4 generates a draft:**  
-   - Using the user’s profile + company summary + contact info, GPT creates a short, personalized cold email connecting the user’s experience to the company’s work.
-
-5. **ML personalization scoring:**  
-   - A TF-IDF + Logistic Regression model evaluates how specific, relevant, and personal the draft is.  
-   - If the score is below a set threshold, ColdReach regenerates or refines the email.
-
-6. **Send and track:**  
-   - Once the draft passes the quality check, ColdReach sends it via **AWS SES**.  
-   - Every email is logged (company, contact, score, and status) for analytics and improvement.
+Currently, email generation uses a **template-based system** with a two-pass placeholder fill (deterministic + GPT contextual). ML-based personalization scoring is planned for a future release.
 
 ---
 
-## 🧰 Technologies Used
+## How It Works
 
-| Layer | Tools | Purpose |
-|-------|-------|----------|
-| **Backend** | **FastAPI (Python)** | Core API endpoints (scraping, generation, scoring, sending) |
-| **AI Generation** | **OpenAI GPT-4 API** | Create contextual, high-quality email drafts |
-| **Machine Learning** | **scikit-learn (TF-IDF + Logistic Regression)** | Evaluate personalization quality |
-| **User Data Scraping** | **BeautifulSoup4, pdfminer, OpenAI summarization** | Extract profile info from resume, LinkedIn, and GitHub |
-| **Company Data Scraping** | **requests**, **BeautifulSoup4** | Summarize company content for GPT context |
-| **Contact Discovery** | **Hunter.io API** | Find contact candidates and select the best-fit person by role |
-| **Cloud & Infrastructure** | **AWS SES**, **S3**, **IAM** | Send emails, store user data securely |
-| **Frontend** | **React + Tailwind CSS** | Simple interface for inputs, review, and analytics |
-| **Data & Tracking** | **pandas**, **CSV** → *Google Sheets or PostgreSQL (future)* | Log emails, scores, and statuses |
-| **Visualization** | **Chart.js / Recharts** | Analytics and performance insights |
+1. **Upload your resume (once per session)**
+   - Upload a PDF resume to `/resume/upload`
+   - The system extracts structured data: name, email, skills, experience, education, LinkedIn, GitHub
+   - Stored in-memory with a `resume_id` for reuse across multiple generations
 
----
+2. **Provide a company URL and email template**
+   - POST to `/scrape/generate` with the company URL, your `resume_id`, and an email template containing placeholders
+   - The system scrapes the company website (title, meta description, headings, keywords)
 
-## 🧩 Personalization Model
+3. **Contact discovery and ranking**
+   - Hunter.io Domain Search returns up to 10 contacts for the company
+   - Company size is detected and a role-ranking strategy is applied:
+     - **Small (1-10):** Prioritizes founders, CTOs, technical co-founders
+     - **Mid (11-50):** Prioritizes VPs of Engineering, tech leads, CTOs
+     - **Large (50+):** Prioritizes recruiters, hiring managers, engineering managers
+   - The best-fit contact is selected automatically
 
-ColdReach’s ML model acts as a **content gatekeeper** — it ensures that generated emails are specific, relevant, and human-like.
+4. **Two-pass email generation**
+   - **Pass 1 (Deterministic):** Fills fixed placeholders — `[Company Name]`, `[First Name]`, `[Sender Name]`, `[LinkedIn]`, `[GitHub]`
+   - **Pass 2 (GPT):** Fills contextual placeholders — `[specific company detail]`, `[company focus area]`, `[resume highlights]` — using scraped company data and your resume as context
 
-It distinguishes between:
-- ✅ **Personalized:** Mentions the company name or project, relates the sender’s background to their work, or references something factual.  
-- ❌ **Generic:** Repetitive, vague, or sounds like a template.
-
-Using TF-IDF text embeddings and Logistic Regression, the model produces a **personalization score (0–1)**.  
-Emails below the set threshold (default 0.6) trigger a regeneration loop until the quality bar is met.
+5. **SES-ready response**
+   - Returns a structured email object with subject, body, recipient info, contact details (name, title, seniority, confidence), and company metadata — ready to plug into a sending service
 
 ---
 
-## ☁️ System Flow
+## Tech Stack
 
-User Uploads (Resume, LinkedIn, GitHub)  
- ↓  
-Scraper → Build & Cache User Profile (store in S3/DB)  
- ↓  
-User Enters Company Name or URL  
- ↓  
-Scraper → Extract & Summarize Company Info  
- ↓  
-Hunter API → Fetch up to 10 Candidate Contacts  
- ↓  
-Role Ranking by Company Size → Choose Best Candidate  
- ↓  
-GPT-4 → Generate Personalized Email  
- ↓  
-ML Model → Score Personalization  
- ↓  
-If score < threshold → Refine Draft  
-If score ≥ threshold → Send via AWS SES  
- ↓  
-Tracker → Log to CSV / Database for Analytics  
+| Technology | Purpose |
+|------------|---------|
+| **FastAPI** | REST API framework |
+| **Uvicorn** | ASGI server |
+| **BeautifulSoup4** | Web scraping (company websites) |
+| **pdfplumber** | PDF resume text extraction and parsing |
+| **OpenAI API** | GPT-powered contextual placeholder filling |
+| **Hunter.io API** | Contact discovery and domain search |
+| **python-dotenv** | Environment variable management |
 
 ---
 
-## 📊 Analytics & Insights
+## API Endpoints
 
-ColdReach tracks each email’s:
-- Personalization score  
-- Contact role and industry  
-- Status (Sent, Opened, Replied, No Response)  
-- Timestamps and response latency  
-
-### From these metrics, the dashboard visualizes:
-- Reply rate and open rate trends  
-- Score vs. reply rate correlation  
-- Top-performing industries and roles  
-- Optimal send times and average response times  
-
-### How it helps:
-- **Users** see what kinds of messages and targets work best.  
-- **You** (the developer) can retrain your ML model using real feedback.  
-- **Future versions** can predict reply likelihood based on past data.
+| Endpoint | Method | Description |
+|----------|--------|-------------|
+| `/` | GET | Health check |
+| `/scrape/` | GET | Scrape a company website (title, meta, keywords) |
+| `/scrape/generate` | POST | Full pipeline — scrape company, find contacts, generate email |
+| `/company/find` | GET | Find and rank contacts by company name or domain |
+| `/resume/upload` | POST | Upload and parse a PDF resume |
 
 ---
 
-## 📊 Example Use Case
+## Project Structure
 
-A student uploads their resume, LinkedIn, and GitHub once.  
-They paste `https://clearcutar.com` into ColdReach.  
-The app scrapes that ClearCutAR builds AR imaging software for surgical wound care.  
-Hunter returns up to 10 likely contacts and ColdReach ranks “Lisa Chen — CTO” as the best fit.  
-The response includes all fetched candidates and a best-contact recommendation for outreach.  
-GPT writes:  
-
-> “Hi Lisa, I loved your team’s work on AR imaging at ClearCutAR — I recently built a project that uses AI for real-time image processing…”  
-
-The ML model scores it **0.84** → passes → ColdReach sends via **AWS SES**.  
-The system logs: company, contact, email text, personalization score, and send status for analytics.
+```
+ColdApproach-AI/
+├── app/
+│   ├── main.py                    # FastAPI app, router registration
+│   ├── models/
+│   │   └── schemas.py             # Pydantic request/response models
+│   ├── routers/
+│   │   ├── scrape.py              # Scraping + email generation endpoints
+│   │   ├── contacts.py            # Hunter.io contact discovery endpoint
+│   │   ├── send.py                # Email sending (stub)
+│   │   └── analytics.py           # Analytics (stub)
+│   ├── routes/
+│   │   └── resume_route.py        # Resume upload + parsing endpoint
+│   ├── services/                  # Service layer (future providers)
+│   └── utils/
+│       ├── generate.py            # Two-pass email generation engine
+│       ├── hunter_client.py       # Hunter.io API client
+│       ├── scraper.py             # Website scraping + keyword extraction
+│       ├── resume_parser.py       # PDF parsing + structured data extraction
+│       ├── resume_store.py        # In-memory resume storage (UUID-keyed)
+│       └── company_analyzer.py    # Company size analysis + role scoring
+├── requirements.txt
+├── .env                           # API keys (OPENAI_API_KEY, HUNTER_API_KEY)
+└── README.md
+```
 
 ---
 
-## ☁️ Summary
+## Getting Started
 
-ColdReach AI blends **AI generation**, **ML evaluation**, **Hunter-based contact discovery**, and **cloud automation** to make outreach smarter, faster, and more meaningful.  
-It empowers users to **connect with startups and professionals** through thoughtful, personalized communication — not spam.
+### Prerequisites
+- Python 3.10+
+- OpenAI API key
+- Hunter.io API key
+
+### Setup
+
+```bash
+# Clone the repo
+git clone https://github.com/your-username/ColdApproach-AI.git
+cd ColdApproach-AI
+
+# Create virtual environment
+python -m venv venv
+source venv/bin/activate
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Configure environment variables
+cp .env.example .env
+# Add your OPENAI_API_KEY and HUNTER_API_KEY to .env
+
+# Run the server
+uvicorn app.main:app --reload
+```
+
+The API will be available at `http://localhost:8000`. Interactive docs at `http://localhost:8000/docs`.
+
+---
+
+## Future Implementations
+
+- **ML Personalization Scoring** — TF-IDF + Logistic Regression model to score generated emails on specificity and relevance; emails below threshold trigger automatic regeneration
+- **Email Sending** — Hybrid Gmail API + Amazon SES provider with automatic domain-based routing, OAuth2 for Gmail users, and EventBridge scheduling for delayed sends
+- **Data Analytics & Tracking** — Track open rates, reply rates, response latency, and personalization scores; visualize performance trends and optimize outreach strategy
+- **React Frontend** — User interface for resume upload, email review, template management, and analytics dashboard
+- **Batch Processing** — SQS-based queue for bulk outreach: submit multiple company URLs, generate and send emails asynchronously
