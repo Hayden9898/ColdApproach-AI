@@ -33,7 +33,7 @@ export function PdfViewer({ src }: PdfViewerProps) {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="flex items-center gap-2 mb-2">
+      <div className="flex items-center gap-2 mb-4">
         <FileText className="h-3.5 w-3.5 text-muted-foreground" />
         <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
           PDF Preview

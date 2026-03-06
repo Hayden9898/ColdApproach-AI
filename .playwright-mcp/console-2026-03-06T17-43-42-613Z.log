@@ -1,5 +1,0 @@
-[  159646ms] [ERROR] Failed to load resource: the server responded with a status of 500 (Internal Server Error) @ http://localhost:8000/resume/upload:0
-[  159669ms] Error: No readable text found in the PDF.
-    at useResumeUpload.useMutation [as onError] (http://localhost:3000/_next/static/chunks/frontend_src_a4865ed7._.js:447:27)
-    at Mutation.execute (http://localhost:3000/_next/static/chunks/frontend_6df5be50._.js:1881:45)
-[  159983ms] [WARNING] Warning: Indexing all PDF objects @ http://localhost:3000/_next/static/media/pdf.worker.min.2d42d502.mjs:24

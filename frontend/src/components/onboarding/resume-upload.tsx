@@ -2,7 +2,7 @@
 
 import { useCallback, useState } from "react";
 import { useDropzone } from "react-dropzone";
-import { Upload, FileText, AlertCircle, Loader2, ArrowLeft } from "lucide-react";
+import { Upload, FileText, AlertCircle, Loader2, ArrowLeft, ChevronDown } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useResumeUpload } from "@/hooks/use-resume-upload";
 import { useAppStore } from "@/store/app-store";
@@ -16,6 +16,7 @@ interface ResumeUploadProps {
 
 export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
   const [error, setError] = useState<string | null>(null);
+  const [eduOpen, setEduOpen] = useState(false);
   const resumeProfile = useAppStore((s) => s.resumeProfile);
   const upload = useResumeUpload();
 
@@ -72,46 +73,26 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
   // Already uploaded — show full parsed resume
   if (resumeProfile && !upload.isPending) {
     return (
-      <div className="space-y-4">
+      <div className="flex flex-col gap-4 h-full">
         <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Resume parsed
-          </h2>
-          <button
+          <div className="flex items-center gap-2">
+            <FileText className="h-3.5 w-3.5 text-muted-foreground" />
+            <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+              Resume parsed
+            </p>
+          </div>
+          <Button
             onClick={handleReplace}
-            className="text-xs text-muted-foreground hover:text-foreground transition-colors"
+            variant="outline"
+            size="xs"
+            className="gap-1.5 hover:text-primary"
           >
+            <Upload className="h-3 w-3" />
             Replace
-          </button>
+          </Button>
         </div>
 
-        <div className="border border-border bg-card rounded-lg divide-y divide-border">
-          {/* Header — name, email, contact */}
-          <div className="p-4 flex items-start gap-3">
-            <FileText className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-            <div className="min-w-0">
-              <p className="text-sm font-medium">
-                {resumeProfile.name ?? "Unknown"}
-              </p>
-              <div className="flex flex-wrap gap-x-3 gap-y-0.5 mt-1">
-                {resumeProfile.email && (
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {resumeProfile.email}
-                  </span>
-                )}
-                {resumeProfile.phone && (
-                  <span className="text-xs font-mono text-muted-foreground">
-                    {resumeProfile.phone}
-                  </span>
-                )}
-                {resumeProfile.location && (
-                  <span className="text-xs text-muted-foreground">
-                    {resumeProfile.location}
-                  </span>
-                )}
-              </div>
-            </div>
-          </div>
+        <div className="flex-1 border border-border bg-card rounded-lg divide-y divide-border">
 
           {/* Skills */}
           {resumeProfile.skills.length > 0 && (
@@ -120,7 +101,7 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
                 Skills
               </p>
               <div className="flex flex-wrap gap-1.5">
-                {resumeProfile.skills.map((skill) => (
+                {resumeProfile.skills.slice(0, 12).map((skill) => (
                   <span
                     key={skill}
                     className="text-xs font-mono bg-secondary text-secondary-foreground px-1.5 py-0.5 rounded-sm"
@@ -128,6 +109,11 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
                     {skill}
                   </span>
                 ))}
+                {resumeProfile.skills.length > 12 && (
+                  <span className="text-xs font-mono text-muted-foreground px-1.5 py-0.5">
+                    +{resumeProfile.skills.length - 12} more
+                  </span>
+                )}
               </div>
             </div>
           )}
@@ -162,23 +148,28 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
             </div>
           )}
 
-          {/* Education */}
-          {resumeProfile.education.length > 0 && (
+          {/* Projects */}
+          {resumeProfile.projects?.length > 0 && (
             <div className="p-4">
               <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground mb-2">
-                Education
+                Projects
               </p>
-              <div className="space-y-2">
-                {resumeProfile.education.map((edu, i) => (
+              <div className="space-y-3">
+                {resumeProfile.projects.map((proj, i) => (
                   <div key={i}>
-                    <p className="text-sm font-medium">
-                      {edu.degree ?? edu.school ?? "Degree"}
-                      {edu.field ? `, ${edu.field}` : ""}
-                    </p>
-                    {edu.school && edu.degree && (
+                    <div className="flex items-baseline justify-between gap-2">
+                      <p className="text-sm font-medium">
+                        {proj.name ?? "Project"}
+                      </p>
+                      {proj.duration && (
+                        <span className="text-xs font-mono text-muted-foreground shrink-0">
+                          {proj.duration}
+                        </span>
+                      )}
+                    </div>
+                    {proj.technologies && (
                       <p className="text-xs text-muted-foreground">
-                        {edu.school}
-                        {edu.gpa ? ` — GPA ${edu.gpa}` : ""}
+                        {proj.technologies}
                       </p>
                     )}
                   </div>
@@ -186,10 +177,48 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
               </div>
             </div>
           )}
+
+          {/* Education (collapsible) */}
+          {resumeProfile.education.length > 0 && (
+            <div>
+              <button
+                onClick={() => setEduOpen(!eduOpen)}
+                className="w-full p-4 flex items-center justify-between cursor-pointer"
+              >
+                <p className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+                  Education
+                </p>
+                <ChevronDown
+                  className={cn(
+                    "h-3.5 w-3.5 text-muted-foreground transition-transform",
+                    eduOpen && "rotate-180",
+                  )}
+                />
+              </button>
+              {eduOpen && (
+                <div className="px-4 pb-4 space-y-2">
+                  {resumeProfile.education.map((edu, i) => (
+                    <div key={i}>
+                      <p className="text-sm font-medium">
+                        {edu.degree ?? edu.school ?? "Degree"}
+                        {edu.field ? `, ${edu.field}` : ""}
+                      </p>
+                      {edu.school && edu.degree && (
+                        <p className="text-xs text-muted-foreground">
+                          {edu.school}
+                          {edu.gpa ? ` — GPA ${edu.gpa}` : ""}
+                        </p>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         <div className="flex justify-between">
-          <Button onClick={onBack} variant="ghost" size="sm" className="gap-1.5">
+          <Button onClick={onBack} variant="ghost" size="sm" className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent">
             <ArrowLeft className="h-3.5 w-3.5" />
             Back
           </Button>

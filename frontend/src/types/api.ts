@@ -85,6 +85,7 @@ export interface ResumeProfile {
   github: string | null;
   skills: string[];
   experience: ExperienceEntry[];
+  projects: ProjectEntry[];
   education: EducationEntry[];
   summary?: string | null;
   resume_text_length?: number;
@@ -105,6 +106,13 @@ export interface EducationEntry {
   gpa?: string;
   location?: string;
   field?: string;
+}
+
+export interface ProjectEntry {
+  name?: string;
+  technologies?: string;
+  duration?: string;
+  description: string | string[];
 }
 
 export interface BatchStatusResponse {
