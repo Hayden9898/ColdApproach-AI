@@ -44,6 +44,7 @@ ROLE_PRIORITIES_BY_SIZE = {
     ],
     "unknown": [
         "CTO",
+        "CEO",
         "Founder",
         "Head of Engineering",
         "Engineering Manager",
