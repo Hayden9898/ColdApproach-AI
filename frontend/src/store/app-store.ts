@@ -9,6 +9,7 @@ interface AppState {
   // Onboarding
   resumeId: string | null;
   resumeProfile: ResumeProfile | null;
+  resumePdfDataUrl: string | null;
   linkedinUrl: string;
   githubUrl: string;
   template: string;
@@ -21,6 +22,7 @@ interface AppState {
 
   // Actions
   setResumeData: (id: string, profile: ResumeProfile) => void;
+  setResumePdf: (dataUrl: string | null) => void;
   setLinks: (linkedin: string, github: string) => void;
   setTemplate: (template: string) => void;
   setSubjectTemplate: (subjectTemplate: string) => void;
@@ -42,6 +44,7 @@ export const useAppStore = create<AppState>()(
     (set) => ({
       resumeId: null,
       resumeProfile: null,
+      resumePdfDataUrl: null,
       linkedinUrl: "",
       githubUrl: "",
       template: DEFAULT_TEMPLATE,
@@ -59,6 +62,8 @@ export const useAppStore = create<AppState>()(
           fromEmail: profile.email || "",
         }),
 
+      setResumePdf: (dataUrl) => set({ resumePdfDataUrl: dataUrl }),
+
       setLinks: (linkedin, github) =>
         set({ linkedinUrl: linkedin, githubUrl: github }),
 
@@ -72,6 +77,7 @@ export const useAppStore = create<AppState>()(
         set({
           resumeId: null,
           resumeProfile: null,
+          resumePdfDataUrl: null,
           linkedinUrl: "",
           githubUrl: "",
           template: DEFAULT_TEMPLATE,
@@ -106,6 +112,7 @@ export const useAppStore = create<AppState>()(
       partialize: (state) => ({
         resumeId: state.resumeId,
         resumeProfile: state.resumeProfile,
+        resumePdfDataUrl: state.resumePdfDataUrl,
         linkedinUrl: state.linkedinUrl,
         githubUrl: state.githubUrl,
         template: state.template,
