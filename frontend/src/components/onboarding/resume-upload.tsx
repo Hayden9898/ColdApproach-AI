@@ -287,7 +287,7 @@ export function ResumeUpload({ onComplete, onBack }: ResumeUploadProps) {
         </div>
       )}
 
-      <Button onClick={onBack} variant="ghost" size="sm" className="gap-1.5">
+      <Button onClick={onBack} variant="ghost" size="sm" className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent">
         <ArrowLeft className="h-3.5 w-3.5" />
         Back
       </Button>

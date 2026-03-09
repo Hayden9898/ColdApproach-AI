@@ -5,6 +5,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/shared/logo";
 import { StepIndicator } from "@/components/onboarding/step-indicator";
 import { ResumeUpload } from "@/components/onboarding/resume-upload";
+import { ProfileSetup } from "@/components/onboarding/profile-setup";
 import { Button } from "@/components/ui/button";
 import { slideRight, fadeIn, DURATION } from "@/lib/animations";
 import { useAppStore } from "@/store/app-store";
@@ -143,25 +144,10 @@ export default function OnboardingPage() {
               )}
 
               {step === 1 && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold tracking-tight">
-                    Verify your links
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Step 3 will build this out.
-                  </p>
-                  <div className="flex justify-between">
-                    <Button
-                      onClick={() => setStep(0)}
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Back
-                    </Button>
-                  </div>
-                </div>
+                <ProfileSetup
+                  onComplete={() => setStep(2)}
+                  onBack={() => setStep(0)}
+                />
               )}
 
               {step === 2 && (
@@ -177,7 +163,7 @@ export default function OnboardingPage() {
                       onClick={() => setStep(1)}
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5"
+                      className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
                       Back
@@ -199,7 +185,7 @@ export default function OnboardingPage() {
                       onClick={() => setStep(2)}
                       variant="ghost"
                       size="sm"
-                      className="gap-1.5"
+                      className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
                     >
                       <ArrowLeft className="h-3.5 w-3.5" />
                       Back
