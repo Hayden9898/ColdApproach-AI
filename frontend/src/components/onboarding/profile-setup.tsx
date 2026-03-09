@@ -1,7 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { ArrowLeft, AlertCircle, Phone, MapPin, Check } from "lucide-react";
+import { ArrowLeft, AlertCircle, Phone, MapPin, Check, Loader2, Mail } from "lucide-react";
+import { useEmailAuth } from "@/hooks/use-email-auth";
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { Button } from "@/components/ui/button";
@@ -86,6 +87,7 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
   const fromEmail = useAppStore((s) => s.fromEmail);
   const setLinks = useAppStore((s) => s.setLinks);
   const setFromEmail = useAppStore((s) => s.setFromEmail);
+  const emailConnected = useAppStore((s) => s.emailConnected);
 
   const [name, setName] = useState(resumeProfile?.name ?? "");
   const [email, setEmail] = useState(fromEmail || resumeProfile?.email || "");
@@ -100,6 +102,9 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
     linkedin: normalizeUrl(linkedin, "linkedin.com"),
     github: normalizeUrl(github, "github.com"),
   });
+
+  const emailValid = email.trim() !== "" && !errors.email;
+  const { isGmail, status: authStatus, mismatchEmail, startAuth, retry } = useEmailAuth(email);
 
   const handleBlur = (field: string) => {
     setTouched((prev) => ({ ...prev, [field]: true }));
@@ -128,7 +133,7 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
   const handleContinue = () => {
     // Mark all fields as touched to surface any remaining errors
     setTouched({ name: true, email: true, linkedin: true, github: true });
-    if (hasHardErrors) return;
+    if (hasHardErrors || !emailConnected) return;
 
     const normalizedLinkedin = normalizeUrl(linkedin, "linkedin.com");
     const normalizedGithub = normalizeUrl(github, "github.com");
@@ -256,7 +261,7 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 onBlur={() => handleBlur("email")}
-                placeholder="you@example.com"
+                placeholder="you@gmail.com"
                 className={cn(inputClass("email", touched, errors), touched.email && !errors.email && "pr-8")}
               />
               {touched.email && !errors.email && (
@@ -267,6 +272,101 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
               <p className="text-xs text-destructive">{errors.email}</p>
             )}
           </div>
+
+          {/* Inline email auth */}
+          {emailValid && (
+            <div className="rounded-md border border-border bg-secondary/30 p-3 space-y-2">
+              {isGmail ? (
+                <>
+                  {authStatus === "idle" && (
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2">
+                        <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                        <span className="text-xs text-muted-foreground">Gmail account</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs gap-1.5"
+                        onClick={() => {
+                          setFromEmail(email.trim());
+                          startAuth();
+                        }}
+                      >
+                        Connect Gmail
+                      </Button>
+                    </div>
+                  )}
+
+                  {authStatus === "checking" && (
+                    <div className="flex items-center gap-2">
+                      <Loader2 className="h-3.5 w-3.5 animate-spin text-primary" />
+                      <span className="text-xs text-muted-foreground">
+                        Verifying connection...
+                      </span>
+                    </div>
+                  )}
+
+                  {authStatus === "connected" && (
+                    <div className="flex items-center gap-2">
+                      <Check className="h-3.5 w-3.5 text-green-500" />
+                      <span className="text-xs text-green-600 dark:text-green-400 font-medium">
+                        Gmail connected
+                      </span>
+                    </div>
+                  )}
+
+                  {authStatus === "mismatch" && (
+                    <div className="space-y-2">
+                      <div className="flex items-start gap-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-destructive shrink-0 mt-0.5" />
+                        <p className="text-xs text-destructive">
+                          You signed in as <span className="font-mono font-medium">{mismatchEmail}</span> but
+                          entered <span className="font-mono font-medium">{email}</span>. Please sign in
+                          with the correct account.
+                        </p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={retry}
+                      >
+                        Try again
+                      </Button>
+                    </div>
+                  )}
+
+                  {authStatus === "error" && (
+                    <div className="space-y-2">
+                      <div className="flex items-center gap-2">
+                        <AlertCircle className="h-3.5 w-3.5 text-destructive" />
+                        <span className="text-xs text-destructive">Authentication failed</span>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-7 text-xs"
+                        onClick={retry}
+                      >
+                        Try again
+                      </Button>
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <Mail className="h-3.5 w-3.5 text-muted-foreground" />
+                  <span className="text-xs text-muted-foreground">
+                    Custom domain email support coming soon. Use a Gmail address to send emails.
+                  </span>
+                </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
 
@@ -280,7 +380,7 @@ export function ProfileSetup({ onComplete, onBack }: ProfileSetupProps) {
           <ArrowLeft className="h-3.5 w-3.5" />
           Back
         </Button>
-        <Button onClick={handleContinue} size="sm">
+        <Button onClick={handleContinue} size="sm" disabled={!emailConnected}>
           Continue
         </Button>
       </div>

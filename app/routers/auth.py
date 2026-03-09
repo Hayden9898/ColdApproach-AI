@@ -8,7 +8,7 @@ import os
 from fastapi import APIRouter, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
-from app.utils.token_store import get_token, save_token
+from app.utils.token_store import get_last_authenticated, get_token, save_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -17,6 +17,7 @@ GOOGLE_CLIENT_SECRET = os.environ.get("GOOGLE_CLIENT_SECRET", "")
 GOOGLE_REDIRECT_URI = os.environ.get(
     "GOOGLE_REDIRECT_URI", "http://localhost:8000/auth/gmail/callback"
 )
+FRONTEND_URL = os.environ.get("FRONTEND_URL", "http://localhost:3000")
 
 SCOPES = (
     "https://www.googleapis.com/auth/gmail.send "
@@ -94,11 +95,7 @@ def gmail_callback(code: str = Query(...), error: str = Query(None)):
         "provider": "gmail",
     })
 
-    return {
-        "success": True,
-        "email": user_email,
-        "message": "Gmail OAuth connected. You can now send emails via POST /send/email.",
-    }
+    return RedirectResponse(url=f"{FRONTEND_URL}/onboarding")
 
 
 @router.get("/gmail/status")
@@ -112,3 +109,10 @@ def gmail_status(email: str = Query(...)):
         "email": email,
         "detail": "No token found. Complete /auth/gmail/login first.",
     }
+
+
+@router.get("/gmail/last-authenticated")
+def last_authenticated():
+    """Return the email of the most recently authenticated Gmail user."""
+    email = get_last_authenticated()
+    return {"email": email}

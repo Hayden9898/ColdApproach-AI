@@ -79,6 +79,10 @@ export async function batchStatus(
   return request(`/batch/${jobId}/status`);
 }
 
+export async function checkLastAuthenticated(): Promise<{ email: string | null }> {
+  return request("/auth/gmail/last-authenticated");
+}
+
 export function getGmailLoginUrl(): string {
   return `${API_BASE}/auth/gmail/login`;
 }

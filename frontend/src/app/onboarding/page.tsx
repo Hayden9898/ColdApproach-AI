@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { Logo } from "@/components/shared/logo";
 import { StepIndicator } from "@/components/onboarding/step-indicator";
@@ -47,9 +47,47 @@ const HOW_IT_WORKS = [
 ];
 
 export default function OnboardingPage() {
-  const [started, setStarted] = useState(false);
-  const [step, setStep] = useState(0);
   const pdfDataUrl = useAppStore((s) => s.resumePdfDataUrl);
+  const storedStep = useAppStore((s) => s.onboardingStep);
+  const storedStarted = useAppStore((s) => s.onboardingStarted);
+  const setOnboardingStep = useAppStore((s) => s.setOnboardingStep);
+  const setOnboardingStarted = useAppStore((s) => s.setOnboardingStarted);
+
+  // Wait for Zustand to hydrate from localStorage before rendering
+  const [hydrated, setHydrated] = useState(false);
+  useEffect(() => {
+    if (useAppStore.persist.hasHydrated()) {
+      setHydrated(true);
+    } else {
+      return useAppStore.persist.onFinishHydration(() => setHydrated(true));
+    }
+  }, []);
+
+  // Local state for React rendering, initialized after hydration
+  const [started, setStartedLocal] = useState(false);
+  const [step, setStepLocal] = useState(0);
+
+  // Restore from persisted store after hydration (runs once)
+  const hasRestoredRef = useRef(false);
+  useEffect(() => {
+    if (!hydrated || hasRestoredRef.current) return;
+    hasRestoredRef.current = true;
+    setStartedLocal(storedStarted);
+    setStepLocal(storedStep);
+  }, [hydrated, storedStarted, storedStep]);
+
+  // Navigation helpers — sync local state + persisted store
+  const setStep = (s: number) => {
+    setStepLocal(s);
+    setOnboardingStep(s);
+  };
+  const setStarted = (s: boolean) => {
+    setStartedLocal(s);
+    setOnboardingStarted(s);
+  };
+
+  // Don't render until store is hydrated — prevents flash of wrong step
+  if (!hydrated) return null;
 
   // Intro screen — before the numbered steps
   if (!started) {

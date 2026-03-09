@@ -16,7 +16,10 @@ interface AppState {
   subjectTemplate: string;
   smoothGrammar: boolean;
   fromEmail: string;
+  onboardingStep: number;
+  onboardingStarted: boolean;
   onboardingComplete: boolean;
+  emailConnected: boolean;
 
   // Template drafts (transient, not persisted)
   draftTemplate: string;
@@ -33,6 +36,9 @@ interface AppState {
   setSubjectTemplate: (subjectTemplate: string) => void;
   setSmoothGrammar: (v: boolean) => void;
   setFromEmail: (email: string) => void;
+  setOnboardingStep: (step: number) => void;
+  setOnboardingStarted: (started: boolean) => void;
+  setEmailConnected: (connected: boolean) => void;
   setDraftTemplate: (template: string) => void;
   setDraftSubjectTemplate: (subjectTemplate: string) => void;
   completeOnboarding: () => void;
@@ -61,7 +67,10 @@ export const useAppStore = create<AppState>()(
       fromEmail: "",
       draftTemplate: DEFAULT_TEMPLATE,
       draftSubjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
+      onboardingStep: 0,
+      onboardingStarted: false,
       onboardingComplete: false,
+      emailConnected: false,
       queue: [],
 
       setResumeData: (id, profile) =>
@@ -82,6 +91,9 @@ export const useAppStore = create<AppState>()(
       setSubjectTemplate: (subjectTemplate) => set({ subjectTemplate }),
       setSmoothGrammar: (v) => set({ smoothGrammar: v }),
       setFromEmail: (email) => set({ fromEmail: email }),
+      setOnboardingStep: (step) => set({ onboardingStep: step }),
+      setOnboardingStarted: (started) => set({ onboardingStarted: started }),
+      setEmailConnected: (connected) => set({ emailConnected: connected }),
       setDraftTemplate: (template) => set({ draftTemplate: template }),
       setDraftSubjectTemplate: (subjectTemplate) => set({ draftSubjectTemplate: subjectTemplate }),
 
@@ -97,7 +109,10 @@ export const useAppStore = create<AppState>()(
           template: DEFAULT_TEMPLATE,
           subjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
           fromEmail: "",
+          onboardingStep: 0,
+          onboardingStarted: false,
           onboardingComplete: false,
+          emailConnected: false,
           queue: [],
         }),
 
@@ -133,7 +148,10 @@ export const useAppStore = create<AppState>()(
         subjectTemplate: state.subjectTemplate,
         smoothGrammar: state.smoothGrammar,
         fromEmail: state.fromEmail,
+        onboardingStep: state.onboardingStep,
+        onboardingStarted: state.onboardingStarted,
         onboardingComplete: state.onboardingComplete,
+        emailConnected: state.emailConnected,
       }),
     },
   ),

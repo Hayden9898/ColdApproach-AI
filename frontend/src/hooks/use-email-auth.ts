@@ -1,0 +1,107 @@
+"use client";
+
+import { useState, useRef, useCallback, useEffect } from "react";
+import { useQuery } from "@tanstack/react-query";
+import { checkLastAuthenticated, getGmailLoginUrl } from "@/lib/api";
+import { useAppStore } from "@/store/app-store";
+
+type AuthStatus = "idle" | "checking" | "connected" | "mismatch" | "error";
+
+const GMAIL_DOMAINS = ["gmail.com", "googlemail.com"];
+
+function isGmailAddress(email: string): boolean {
+  const domain = email.trim().toLowerCase().split("@")[1];
+  return GMAIL_DOMAINS.includes(domain);
+}
+
+export function useEmailAuth(email: string) {
+  const [status, setStatus] = useState<AuthStatus>("idle");
+  const [mismatchEmail, setMismatchEmail] = useState<string | null>(null);
+  const verifiedEmailRef = useRef<string | null>(null);
+  const hasCheckedOnMount = useRef(false);
+  const setEmailConnected = useAppStore((s) => s.setEmailConnected);
+  const emailConnected = useAppStore((s) => s.emailConnected);
+
+  const isGmail = isGmailAddress(email);
+
+  // Reset auth state when email changes
+  useEffect(() => {
+    if (verifiedEmailRef.current && email.toLowerCase() !== verifiedEmailRef.current) {
+      setStatus("idle");
+      setMismatchEmail(null);
+      setEmailConnected(false);
+      verifiedEmailRef.current = null;
+    }
+  }, [email, setEmailConnected]);
+
+  // On mount: if already connected, restore. Otherwise, check if user just returned from OAuth.
+  useEffect(() => {
+    if (hasCheckedOnMount.current) return;
+    hasCheckedOnMount.current = true;
+
+    if (emailConnected) {
+      setStatus("connected");
+      verifiedEmailRef.current = email.toLowerCase();
+    } else if (isGmail) {
+      // User may have just returned from OAuth redirect — check once
+      setStatus("checking");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // One-time check of last-authenticated (no polling)
+  const { data } = useQuery({
+    queryKey: ["gmail-last-authenticated"],
+    queryFn: checkLastAuthenticated,
+    enabled: status === "checking" && isGmail,
+    retry: false,
+    staleTime: 0,
+  });
+
+  // React to the one-time check result
+  useEffect(() => {
+    if (status !== "checking") return;
+
+    if (data === undefined) return; // still loading
+
+    if (!data?.email) {
+      // No one has authenticated yet — go back to idle
+      setStatus("idle");
+      return;
+    }
+
+    const authedEmail = data.email.toLowerCase();
+    const expectedEmail = email.trim().toLowerCase();
+
+    if (authedEmail === expectedEmail) {
+      setStatus("connected");
+      setEmailConnected(true);
+      verifiedEmailRef.current = expectedEmail;
+    } else {
+      setStatus("mismatch");
+      setMismatchEmail(data.email);
+    }
+  }, [data, status, email, setEmailConnected]);
+
+  // Full-page redirect to Gmail OAuth
+  const startAuth = useCallback(() => {
+    if (!isGmail) return;
+    window.location.href = getGmailLoginUrl();
+  }, [isGmail]);
+
+  // Reset to idle so user can try again
+  const retry = useCallback(() => {
+    setStatus("idle");
+    setMismatchEmail(null);
+    setEmailConnected(false);
+    verifiedEmailRef.current = null;
+  }, [setEmailConnected]);
+
+  return {
+    isGmail,
+    status,
+    mismatchEmail,
+    startAuth,
+    retry,
+  };
+}
