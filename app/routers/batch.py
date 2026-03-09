@@ -64,6 +64,7 @@ def submit_batch(request: BatchSubmitRequest):
             "subject_template": request.subject_template,
             "linkedin_url": request.linkedin_url,
             "github_url": request.github_url,
+            "smooth_grammar": request.smooth_grammar,
             "send_at": request.send_at.isoformat() if request.send_at else None,
         })
 

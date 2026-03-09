@@ -136,6 +136,7 @@ def generate_email(request: GenerateEmailRequest):
         subject_template=request.subject_template,
         linkedin_url=request.linkedin_url,
         github_url=request.github_url,
+        smooth_grammar=request.smooth_grammar,
     )
 
     # 4. Build HTML version for preview

@@ -9,6 +9,7 @@ export interface GenerateEmailRequest {
   subject_template?: string | null;
   linkedin_url?: string | null;
   github_url?: string | null;
+  smooth_grammar?: boolean;
 }
 
 export interface SendEmailRequest {
@@ -31,6 +32,7 @@ export interface BatchSubmitRequest {
   subject_template?: string | null;
   linkedin_url?: string | null;
   github_url?: string | null;
+  smooth_grammar?: boolean;
   send_at?: string | null;
 }
 

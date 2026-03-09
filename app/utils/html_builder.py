@@ -22,6 +22,13 @@ def markdown_to_html(text: str) -> str:
     # Bold: **text** → <strong>text</strong>
     text = re.sub(r"\*\*(.+?)\*\*", r"<strong>\1</strong>", text)
 
+    # Markdown links: [text](url) → <a href="url">text</a>
+    text = re.sub(
+        r"\[([^\]]+)\]\(([^)]+)\)",
+        r'<a href="\2" style="color:#1a73e8;text-decoration:underline;">\1</a>',
+        text,
+    )
+
     # Split into paragraphs on double newlines
     paragraphs = re.split(r"\n{2,}", text.strip())
 

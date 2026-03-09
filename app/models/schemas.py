@@ -19,6 +19,7 @@ class GenerateEmailRequest(BaseModel):
     subject_template: Optional[str] = None   # subject line template with placeholders
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
+    smooth_grammar: bool = True              # allow GPT to smooth grammar around placeholders
 
 
 # ---------------------------------------------------------------------------
@@ -71,6 +72,7 @@ class BatchSubmitRequest(BaseModel):
     subject_template: Optional[str] = None
     linkedin_url: Optional[str] = None
     github_url: Optional[str] = None
+    smooth_grammar: bool = True
     send_at: Optional[datetime] = None         # None = send after generation, set = schedule all
 
     @field_validator("send_at", mode="before")

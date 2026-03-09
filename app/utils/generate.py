@@ -285,12 +285,30 @@ def generate_template_prompt(
     company_data: Optional[Dict[str, Any]] = None,
     resume_data: Optional[Dict[str, Any]] = None,
     contact_data: Optional[Dict[str, Any]] = None,
+    smooth_grammar: bool = True,
 ) -> str:
     """
     Build a prompt that instructs GPT to fill contextual placeholders
     in a pre-filled template using the scraped/company/resume context.
+
+    When smooth_grammar is True, GPT may make minor grammar adjustments
+    around placeholders for natural flow. When False, GPT must not
+    modify any text outside the brackets.
     """
     sections = _build_context_sections(scraped_data, company_data, resume_data, contact_data)
+
+    if smooth_grammar:
+        structure_rules = (
+            "- You may make minor grammar adjustments to words immediately surrounding a placeholder "
+            "so the sentence reads naturally (e.g. fix article agreement, verb tense, possessives)\n"
+            "- Do NOT change the overall structure, tone, or meaning of any sentence\n"
+            "- Do NOT add new sentences, remove sentences, or rearrange paragraphs\n"
+        )
+    else:
+        structure_rules = (
+            "- Do NOT modify any text outside the brackets — keep every word exactly as written\n"
+            "- Keep the template's tone and structure exactly as written\n"
+        )
 
     sections.append(
         "You have been given a partially filled email template below. "
@@ -305,8 +323,8 @@ def generate_template_prompt(
         "Create concise bullet points prefixed with `- ` (one per line)\n"
         "- Wrap key metrics and numbers in **double asterisks** (e.g. **$1.6M+**, **83%**, **10k+ sessions**)\n"
         "- Do NOT include LinkedIn/GitHub URLs in the body — they are added separately\n"
-        "- Keep the template's tone and structure exactly as written\n"
-        "- Do NOT add content outside the placeholders\n"
+        + structure_rules
+        + "- Do NOT add content outside the placeholders\n"
         "- Do NOT remove or rearrange any part of the template\n"
         "- Return the completed email body only — no extra formatting or labels\n\n"
         f"--- Template to fill ---\n{pre_filled_template}"
@@ -356,6 +374,7 @@ def get_openai_response(
     subject_template: Optional[str] = None,
     linkedin_url: Optional[str] = None,
     github_url: Optional[str] = None,
+    smooth_grammar: bool = True,
 ) -> Dict[str, str]:
     """
     Generate a personalized cold email using GPT.
@@ -380,7 +399,8 @@ def get_openai_response(
 
         # Pass 2: GPT fills contextual placeholders
         prompt = generate_template_prompt(
-            pre_filled, scraped_data, company_data, resume_data, contact_data
+            pre_filled, scraped_data, company_data, resume_data, contact_data,
+            smooth_grammar=smooth_grammar,
         )
         system_msg = (
             "You fill in email templates by replacing bracketed placeholders "

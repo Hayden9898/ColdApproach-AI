@@ -122,6 +122,7 @@ def _process_message(message: dict) -> None:
             subject_template=body.get("subject_template"),
             linkedin_url=body.get("linkedin_url"),
             github_url=body.get("github_url"),
+            smooth_grammar=body.get("smooth_grammar", True),
         )
 
         # 4. Build HTML email and attachments

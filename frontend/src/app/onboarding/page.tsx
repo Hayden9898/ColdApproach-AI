@@ -6,8 +6,11 @@ import { Logo } from "@/components/shared/logo";
 import { StepIndicator } from "@/components/onboarding/step-indicator";
 import { ResumeUpload } from "@/components/onboarding/resume-upload";
 import { ProfileSetup } from "@/components/onboarding/profile-setup";
+import { TemplateEditor } from "@/components/onboarding/template-editor";
+import { EmailPreview } from "@/components/onboarding/email-preview";
 import { Button } from "@/components/ui/button";
 import { slideRight, fadeIn, DURATION } from "@/lib/animations";
+import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import dynamic from "next/dynamic";
 
@@ -112,20 +115,33 @@ export default function OnboardingPage() {
   }
 
   // Numbered step flow
+  const isTemplateStep = step === 2;
+
   return (
-    <div className="flex min-h-screen flex-col items-center px-6 py-12">
-      <div className="w-full max-w-5xl space-y-8">
-        <div className="flex items-center justify-between">
+    <div
+      className={cn(
+        "flex flex-col items-center px-6",
+        isTemplateStep ? "h-screen py-6" : "min-h-screen py-12",
+      )}
+    >
+      <div
+        className={cn(
+          "w-full max-w-5xl",
+          isTemplateStep
+            ? "flex flex-col flex-1 min-h-0 gap-4"
+            : "space-y-8",
+        )}
+      >
+        <div className="flex items-center justify-between shrink-0">
           <Logo />
           <StepIndicator steps={STEPS} current={step} />
         </div>
 
         <div
-          className={
-            step === 0 && pdfDataUrl
-              ? "grid grid-cols-1 lg:grid-cols-2 gap-8"
-              : ""
-          }
+          className={cn(
+            step === 0 && pdfDataUrl && "grid grid-cols-1 lg:grid-cols-2 gap-8",
+            isTemplateStep && "flex-1 min-h-0",
+          )}
         >
           <AnimatePresence mode="wait">
             <motion.div
@@ -135,6 +151,7 @@ export default function OnboardingPage() {
               animate="animate"
               exit="exit"
               transition={{ duration: DURATION.normal }}
+              className={isTemplateStep ? "h-full" : undefined}
             >
               {step === 0 && (
                 <ResumeUpload
@@ -151,23 +168,24 @@ export default function OnboardingPage() {
               )}
 
               {step === 2 && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold tracking-tight">
-                    Set your email template
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Step 3 will build this out.
-                  </p>
-                  <div className="flex justify-between">
-                    <Button
-                      onClick={() => setStep(1)}
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Back
-                    </Button>
+                <div className="flex flex-col h-full gap-4">
+                  <div className="shrink-0">
+                    <h2 className="text-lg font-semibold tracking-tight">
+                      Configure your template
+                    </h2>
+                    <p className="text-sm text-muted-foreground mt-1">
+                      Customize your email template. Placeholders in brackets
+                      will be filled automatically when emails are generated.
+                    </p>
+                  </div>
+                  <div className="grid grid-cols-1 lg:grid-cols-[3fr_2fr] gap-8 flex-1 min-h-0">
+                    <TemplateEditor
+                      onComplete={() => setStep(3)}
+                      onBack={() => setStep(1)}
+                    />
+                    <div className="hidden lg:block min-h-0">
+                      <EmailPreview />
+                    </div>
                   </div>
                 </div>
               )}

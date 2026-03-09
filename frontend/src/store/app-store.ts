@@ -14,8 +14,13 @@ interface AppState {
   githubUrl: string;
   template: string;
   subjectTemplate: string;
+  smoothGrammar: boolean;
   fromEmail: string;
   onboardingComplete: boolean;
+
+  // Template drafts (transient, not persisted)
+  draftTemplate: string;
+  draftSubjectTemplate: string;
 
   // Dashboard
   queue: QueueItem[];
@@ -26,7 +31,10 @@ interface AppState {
   setLinks: (linkedin: string, github: string) => void;
   setTemplate: (template: string) => void;
   setSubjectTemplate: (subjectTemplate: string) => void;
+  setSmoothGrammar: (v: boolean) => void;
   setFromEmail: (email: string) => void;
+  setDraftTemplate: (template: string) => void;
+  setDraftSubjectTemplate: (subjectTemplate: string) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
   addToQueue: (id: string, url: string) => void;
@@ -49,7 +57,10 @@ export const useAppStore = create<AppState>()(
       githubUrl: "",
       template: DEFAULT_TEMPLATE,
       subjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
+      smoothGrammar: true,
       fromEmail: "",
+      draftTemplate: DEFAULT_TEMPLATE,
+      draftSubjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
       onboardingComplete: false,
       queue: [],
 
@@ -69,7 +80,10 @@ export const useAppStore = create<AppState>()(
 
       setTemplate: (template) => set({ template }),
       setSubjectTemplate: (subjectTemplate) => set({ subjectTemplate }),
+      setSmoothGrammar: (v) => set({ smoothGrammar: v }),
       setFromEmail: (email) => set({ fromEmail: email }),
+      setDraftTemplate: (template) => set({ draftTemplate: template }),
+      setDraftSubjectTemplate: (subjectTemplate) => set({ draftSubjectTemplate: subjectTemplate }),
 
       completeOnboarding: () => set({ onboardingComplete: true }),
 
@@ -117,6 +131,7 @@ export const useAppStore = create<AppState>()(
         githubUrl: state.githubUrl,
         template: state.template,
         subjectTemplate: state.subjectTemplate,
+        smoothGrammar: state.smoothGrammar,
         fromEmail: state.fromEmail,
         onboardingComplete: state.onboardingComplete,
       }),
