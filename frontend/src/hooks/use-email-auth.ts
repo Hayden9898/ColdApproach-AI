@@ -2,7 +2,7 @@
 
 import { useState, useRef, useCallback, useEffect } from "react";
 import { useQuery } from "@tanstack/react-query";
-import { checkLastAuthenticated, getGmailLoginUrl } from "@/lib/api";
+import { checkLastAuthenticated, checkGmailStatus, getGmailLoginUrl } from "@/lib/api";
 import { useAppStore } from "@/store/app-store";
 
 type AuthStatus = "idle" | "checking" | "connected" | "mismatch" | "error";
@@ -40,8 +40,22 @@ export function useEmailAuth(email: string) {
     hasCheckedOnMount.current = true;
 
     if (emailConnected) {
-      setStatus("connected");
-      verifiedEmailRef.current = email.toLowerCase();
+      // Verify the backend still has the OAuth token (lost on server restart)
+      checkGmailStatus(email)
+        .then((res) => {
+          if (res.authenticated) {
+            setStatus("connected");
+            verifiedEmailRef.current = email.toLowerCase();
+          } else {
+            setEmailConnected(false);
+            setStatus("idle");
+          }
+        })
+        .catch(() => {
+          // Backend unreachable — reset to safe state
+          setEmailConnected(false);
+          setStatus("idle");
+        });
     } else if (isGmail) {
       // User may have just returned from OAuth redirect — check once
       setStatus("checking");

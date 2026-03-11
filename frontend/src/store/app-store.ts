@@ -140,9 +140,6 @@ export const useAppStore = create<AppState>()(
     {
       name: "coldapproach-store",
       partialize: (state) => ({
-        resumeId: state.resumeId,
-        resumeProfile: state.resumeProfile,
-        resumePdfDataUrl: state.resumePdfDataUrl,
         linkedinUrl: state.linkedinUrl,
         githubUrl: state.githubUrl,
         template: state.template,
