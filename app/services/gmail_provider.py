@@ -34,7 +34,7 @@ class GmailProvider(EmailProvider):
             token_uri="https://oauth2.googleapis.com/token",
             client_id=os.environ.get("GOOGLE_CLIENT_ID"),
             client_secret=os.environ.get("GOOGLE_CLIENT_SECRET"),
-            scopes=["https://www.googleapis.com/auth/gmail.send"],
+            scopes=["https://www.googleapis.com/auth/gmail.compose"],
         )
 
         # Refresh expired token
@@ -50,6 +50,45 @@ class GmailProvider(EmailProvider):
 
         return build("gmail", "v1", credentials=creds)
 
+    def _build_raw_message(
+        self,
+        from_email: str,
+        to_email: str,
+        subject: str,
+        body: str,
+        reply_to: Optional[str] = None,
+        html_body: Optional[str] = None,
+        attachments: Optional[List[Tuple[str, bytes, str]]] = None,
+    ) -> str:
+        """Build a MIME message and return its base64url-encoded raw string."""
+        if html_body and attachments:
+            message = MIMEMultipart("mixed")
+            alt = MIMEMultipart("alternative")
+            alt.attach(MIMEText(body, "plain"))
+            alt.attach(MIMEText(html_body, "html"))
+            message.attach(alt)
+            for filename, file_bytes, mime_type in attachments:
+                maintype, subtype = mime_type.split("/", 1)
+                part = MIMEBase(maintype, subtype)
+                part.set_payload(file_bytes)
+                encoders.encode_base64(part)
+                part.add_header("Content-Disposition", "attachment", filename=filename)
+                message.attach(part)
+        elif html_body:
+            message = MIMEMultipart("alternative")
+            message.attach(MIMEText(body, "plain"))
+            message.attach(MIMEText(html_body, "html"))
+        else:
+            message = MIMEText(body)
+
+        message["to"] = to_email
+        message["from"] = from_email
+        message["subject"] = subject
+        if reply_to:
+            message["Reply-To"] = reply_to
+
+        return base64.urlsafe_b64encode(message.as_bytes()).decode()
+
     def send(
         self,
         from_email: str,
@@ -62,44 +101,67 @@ class GmailProvider(EmailProvider):
     ) -> Dict[str, Any]:
         try:
             service = self._get_gmail_service(from_email)
-
-            if html_body and attachments:
-                # HTML + attachments → mixed with alternative inside
-                message = MIMEMultipart("mixed")
-                alt = MIMEMultipart("alternative")
-                alt.attach(MIMEText(body, "plain"))
-                alt.attach(MIMEText(html_body, "html"))
-                message.attach(alt)
-                for filename, file_bytes, mime_type in attachments:
-                    maintype, subtype = mime_type.split("/", 1)
-                    part = MIMEBase(maintype, subtype)
-                    part.set_payload(file_bytes)
-                    encoders.encode_base64(part)
-                    part.add_header("Content-Disposition", "attachment", filename=filename)
-                    message.attach(part)
-            elif html_body:
-                # HTML + plain text, no attachments → alternative
-                message = MIMEMultipart("alternative")
-                message.attach(MIMEText(body, "plain"))
-                message.attach(MIMEText(html_body, "html"))
-            else:
-                # Plain text only — unchanged
-                message = MIMEText(body)
-
-            message["to"] = to_email
-            message["from"] = from_email
-            message["subject"] = subject
-            if reply_to:
-                message["Reply-To"] = reply_to
-
-            raw = base64.urlsafe_b64encode(message.as_bytes()).decode()
+            raw = self._build_raw_message(
+                from_email, to_email, subject, body, reply_to, html_body, attachments
+            )
             result = (
                 service.users()
                 .messages()
                 .send(userId="me", body={"raw": raw})
                 .execute()
             )
+            return {
+                "success": True,
+                "message_id": result.get("id"),
+                "error": None,
+            }
+        except Exception as exc:
+            return {"success": False, "message_id": None, "error": str(exc)}
 
+    def create_draft(
+        self,
+        from_email: str,
+        to_email: str,
+        subject: str,
+        body: str,
+        reply_to: Optional[str] = None,
+        html_body: Optional[str] = None,
+        attachments: Optional[List[Tuple[str, bytes, str]]] = None,
+    ) -> Dict[str, Any]:
+        """Create a Gmail draft. Returns draft_id for later sending."""
+        try:
+            service = self._get_gmail_service(from_email)
+            raw = self._build_raw_message(
+                from_email, to_email, subject, body, reply_to, html_body, attachments
+            )
+            result = (
+                service.users()
+                .drafts()
+                .create(userId="me", body={"message": {"raw": raw}})
+                .execute()
+            )
+            return {
+                "success": True,
+                "draft_id": result.get("id"),
+                "error": None,
+            }
+        except Exception as exc:
+            return {"success": False, "draft_id": None, "error": str(exc)}
+
+    def send_draft(
+        self,
+        from_email: str,
+        draft_id: str,
+    ) -> Dict[str, Any]:
+        """Send an existing Gmail draft by ID."""
+        try:
+            service = self._get_gmail_service(from_email)
+            result = (
+                service.users()
+                .drafts()
+                .send(userId="me", body={"id": draft_id})
+                .execute()
+            )
             return {
                 "success": True,
                 "message_id": result.get("id"),

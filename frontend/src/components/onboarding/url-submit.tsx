@@ -41,6 +41,13 @@ function extractDomain(url: string): string {
   }
 }
 
+function toLocalDateStr(date: Date): string {
+  const y = date.getFullYear();
+  const m = (date.getMonth() + 1).toString().padStart(2, "0");
+  const d = date.getDate().toString().padStart(2, "0");
+  return `${y}-${m}-${d}`;
+}
+
 function buildDayOptions(): { label: string; value: string }[] {
   const options: { label: string; value: string }[] = [];
   const now = new Date();
@@ -48,7 +55,7 @@ function buildDayOptions(): { label: string; value: string }[] {
   for (let i = 0; i < 7; i++) {
     const date = new Date(now);
     date.setDate(date.getDate() + i);
-    const dateStr = date.toISOString().split("T")[0];
+    const dateStr = toLocalDateStr(date);
 
     let label: string;
     if (i === 0) label = "Today";
@@ -332,9 +339,8 @@ export function UrlSubmit({ onBack }: UrlSubmitProps) {
                 <div className="flex items-start gap-2 rounded-md border border-border bg-secondary/30 p-2.5">
                   <AlertCircle className="h-3.5 w-3.5 text-muted-foreground shrink-0 mt-0.5" />
                   <p className="text-xs text-muted-foreground">
-                    Scheduled emails are stored in server memory. Server restarts
-                    before the send time may cause delivery to fail. For best
-                    reliability, schedule within a few days.
+                    Scheduled emails will appear as drafts in your Gmail until
+                    the send time. You can review or cancel them from Gmail.
                   </p>
                 </div>
               </motion.div>

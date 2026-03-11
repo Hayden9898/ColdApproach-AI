@@ -21,9 +21,8 @@ def _get_scheduler_client():
 
 
 def create_schedule(
-    email_id: str,
+    draft_id: str,
     send_at: datetime,
-    provider_name: str,
     from_email: str,
 ) -> Dict[str, Any]:
     """
@@ -41,7 +40,7 @@ def create_schedule(
             "error": "SEND_EMAIL_LAMBDA_ARN or SCHEDULER_ROLE_ARN not configured.",
         }
 
-    schedule_name = f"coldreach-send-{email_id}"
+    schedule_name = f"coldreach-send-{draft_id}"
     schedule_expression = f"at({send_at.strftime('%Y-%m-%dT%H:%M:%S')})"
 
     try:
@@ -55,8 +54,7 @@ def create_schedule(
                 "Arn": lambda_arn,
                 "RoleArn": scheduler_role_arn,
                 "Input": json.dumps({
-                    "email_id": email_id,
-                    "provider": provider_name,
+                    "draft_id": draft_id,
                     "from_email": from_email,
                 }),
             },

@@ -170,29 +170,33 @@ def _process_message(message: dict) -> None:
         send_at = body.get("send_at")
 
         if send_at:
-            # Schedule for later
+            # Schedule for later — create Gmail draft + EventBridge schedule
             from datetime import datetime, timezone
-            from app.utils.email_store import save_email
             from app.services.scheduler import create_schedule
 
-            email_id = save_email({
-                "from_email": from_email,
-                "to_email": to_email,
-                "subject": email_result["subject"],
-                "body": plain_body,
-                "html_body": html_body,
-            })
+            draft_result = provider.create_draft(
+                from_email=from_email,
+                to_email=to_email,
+                subject=email_result["subject"],
+                body=plain_body,
+                html_body=html_body,
+                attachments=attachments or None,
+            )
+
+            if not draft_result["success"]:
+                update_batch_result(job_id, url, status="failed", result=result_data, error=f"Draft creation failed: {draft_result['error']}")
+                return
 
             send_time = datetime.fromisoformat(send_at)
             if send_time.tzinfo is None:
                 send_time = send_time.replace(tzinfo=timezone.utc)
 
             create_schedule(
-                email_id=email_id,
+                draft_id=draft_result["draft_id"],
                 send_at=send_time,
-                provider_name=provider.provider_name(),
                 from_email=from_email,
             )
+            result_data["draft_id"] = draft_result["draft_id"]
             update_batch_result(job_id, url, status="scheduled", result=result_data)
         else:
             # Send instantly

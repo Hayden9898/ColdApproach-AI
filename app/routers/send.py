@@ -8,9 +8,10 @@ from datetime import datetime, timezone
 
 from fastapi import APIRouter, HTTPException
 
+from pydantic import BaseModel
+
 from app.models.schemas import SendEmailRequest, SendEmailResponse, SESVerifyRequest
 from app.services.provider_factory import get_provider
-from app.utils.email_store import get_email, save_email
 
 router = APIRouter(prefix="/send", tags=["send"])
 
@@ -34,7 +35,7 @@ def send_email(request: SendEmailRequest):
     if not validation["verified"]:
         raise HTTPException(status_code=403, detail=validation["detail"])
 
-    # --- Scheduled send ---
+    # --- Scheduled send (via Gmail draft) ---
     if request.send_at:
         send_time = request.send_at
         if send_time.tzinfo is None:
@@ -43,22 +44,27 @@ def send_email(request: SendEmailRequest):
         if send_time <= datetime.now(timezone.utc):
             raise HTTPException(status_code=400, detail="send_at must be in the future.")
 
-        # Store payload for Lambda retrieval
-        email_id = save_email({
-            "from_email": request.from_email,
-            "to_email": request.to_email,
-            "subject": request.subject,
-            "body": request.body,
-            "reply_to": request.reply_to,
-            "html_body": request.html_body,
-        })
+        # Create Gmail draft instead of storing in memory
+        draft_result = provider.create_draft(
+            from_email=request.from_email,
+            to_email=request.to_email,
+            subject=request.subject,
+            body=request.body,
+            reply_to=request.reply_to,
+            html_body=request.html_body,
+        )
+
+        if not draft_result["success"]:
+            raise HTTPException(
+                status_code=500,
+                detail=f"Draft creation failed: {draft_result['error']}",
+            )
 
         from app.services.scheduler import create_schedule
 
         schedule_result = create_schedule(
-            email_id=email_id,
+            draft_id=draft_result["draft_id"],
             send_at=send_time,
-            provider_name=provider.provider_name(),
             from_email=request.from_email,
         )
 
@@ -73,7 +79,7 @@ def send_email(request: SendEmailRequest):
             provider=provider.provider_name(),
             scheduled=True,
             scheduled_at=send_time.isoformat(),
-            email_id=email_id,
+            email_id=draft_result["draft_id"],
         )
 
     # --- Instant send ---
@@ -128,10 +134,29 @@ def ses_verification_status(email: str):
     return {"email": email, **result}
 
 
-@router.get("/scheduled/{email_id}")
-def get_scheduled_email(email_id: str):
-    """Retrieve a stored scheduled email payload (used by Lambda)."""
-    email_data = get_email(email_id)
-    if not email_data:
-        raise HTTPException(status_code=404, detail="Scheduled email not found.")
-    return {"success": True, "email": email_data}
+class SendDraftRequest(BaseModel):
+    draft_id: str
+    from_email: str
+
+
+@router.post("/draft")
+def send_draft(request: SendDraftRequest):
+    """Send a Gmail draft by ID (used by Lambda at scheduled time)."""
+    provider = get_provider(request.from_email)
+
+    validation = provider.validate_sender(request.from_email)
+    if not validation["verified"]:
+        raise HTTPException(status_code=403, detail=validation["detail"])
+
+    result = provider.send_draft(
+        from_email=request.from_email,
+        draft_id=request.draft_id,
+    )
+
+    if not result["success"]:
+        raise HTTPException(status_code=500, detail=f"Draft send failed: {result['error']}")
+
+    return {
+        "success": True,
+        "message_id": result["message_id"],
+    }
