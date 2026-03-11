@@ -613,6 +613,8 @@ def get_openai_response(
             )
             for key, value in fills.items():
                 filled = filled.replace(f"[{key}]", value)
+            # Clean up double punctuation from fill values that already end with punctuation
+            filled = re.sub(r"([.!?,;:])\1+", r"\1", filled)
 
         # 4. Build subject
         subject = ""
