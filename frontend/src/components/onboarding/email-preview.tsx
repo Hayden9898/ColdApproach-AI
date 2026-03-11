@@ -1,54 +1,13 @@
 "use client";
 
-import { type ReactNode } from "react";
+import DOMPurify from "dompurify";
 import { Mail } from "lucide-react";
 import { useAppStore } from "@/store/app-store";
 import {
   replacePlaceholders,
   getPreviewData,
-  segmentPreviewText,
+  resolvePreviewHtml,
 } from "@/lib/template-utils";
-
-const LINK_REGEX = /\[([^\]]+)\]\(([^)]+)\)/g;
-
-/** Parse markdown links [text](url) in a string and return React nodes. */
-function renderWithLinks(text: string, className?: string): ReactNode[] {
-  const nodes: ReactNode[] = [];
-  let lastIndex = 0;
-
-  for (const match of text.matchAll(LINK_REGEX)) {
-    const start = match.index!;
-    if (start > lastIndex) {
-      nodes.push(
-        <span key={`t-${lastIndex}`} className={className}>
-          {text.slice(lastIndex, start)}
-        </span>,
-      );
-    }
-    nodes.push(
-      <a
-        key={`l-${start}`}
-        href={match[2]}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="text-blue-400 underline underline-offset-2"
-      >
-        {match[1]}
-      </a>,
-    );
-    lastIndex = start + match[0].length;
-  }
-
-  if (lastIndex < text.length) {
-    nodes.push(
-      <span key={`t-${lastIndex}`} className={className}>
-        {text.slice(lastIndex)}
-      </span>,
-    );
-  }
-
-  return nodes.length > 0 ? nodes : [<span key="full" className={className}>{text}</span>];
-}
 
 export function EmailPreview() {
   const draftTemplate = useAppStore((s) => s.draftTemplate);
@@ -62,9 +21,15 @@ export function EmailPreview() {
   const senderName = resumeProfile?.name ?? "You";
 
   const resolvedSubject = replacePlaceholders(draftSubjectTemplate, previewData);
-  const bodySegments = segmentPreviewText(draftTemplate, previewData);
+  const rawPreviewHtml = resolvePreviewHtml(draftTemplate, previewData);
+  const sanitizedHtml = DOMPurify.sanitize(rawPreviewHtml, {
+    ALLOWED_TAGS: [
+      "p", "br", "strong", "em", "u", "a", "ul", "ol", "li", "span",
+    ],
+    ALLOWED_ATTR: ["href", "target", "rel", "class", "style"],
+  });
 
-  const hasContent = draftTemplate.trim().length > 0;
+  const hasContent = draftTemplate.replace(/<[^>]*>/g, "").trim().length > 0;
 
   return (
     <div className="flex flex-col min-h-0 h-full">
@@ -97,19 +62,13 @@ export function EmailPreview() {
           </div>
         </div>
 
-        {/* Email body */}
+        {/* Email body — rendered HTML */}
         <div className="p-4 flex-1 min-h-0 overflow-y-auto">
           {hasContent ? (
-            <div className="whitespace-pre-wrap text-sm leading-relaxed">
-              {bodySegments.map((seg, i) => (
-                <span key={i}>
-                  {renderWithLinks(
-                    seg.text,
-                    seg.isContextual ? "italic text-primary/80" : undefined,
-                  )}
-                </span>
-              ))}
-            </div>
+            <div
+              className="email-preview-html text-sm leading-relaxed"
+              dangerouslySetInnerHTML={{ __html: sanitizedHtml }}
+            />
           ) : (
             <p className="text-sm text-muted-foreground italic">
               Start typing your template to see a preview.

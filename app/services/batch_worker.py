@@ -122,7 +122,6 @@ def _process_message(message: dict) -> None:
             subject_template=body.get("subject_template"),
             linkedin_url=body.get("linkedin_url"),
             github_url=body.get("github_url"),
-            smooth_grammar=body.get("smooth_grammar", True),
         )
 
         # 4. Build HTML email and attachments
@@ -135,9 +134,13 @@ def _process_message(message: dict) -> None:
         linkedin = email_result.get("linkedin_url", "")
         github = email_result.get("github_url", "")
         sender_name = (resume_profile or {}).get("name", "")
+        body_is_html = email_result.get("is_html", False)
 
         body_html = markdown_to_html(email_result["body"])
-        html_body = wrap_html_email(body_html, linkedin, github, sender_name)
+        html_body = wrap_html_email(
+            body_html, linkedin, github, sender_name,
+            skip_footer=body_is_html,
+        )
         plain_body = build_plain_text_fallback(email_result["body"], linkedin, github)
 
         # Build attachments list

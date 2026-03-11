@@ -7,15 +7,26 @@ import re
 from typing import Optional
 
 
+def is_html(text: str) -> bool:
+    """Check if text appears to be HTML (contains HTML tags)."""
+    return bool(re.search(r"<(?:p|div|br|ul|ol|li|strong|em|a|span|h[1-6])\b", text))
+
+
 def markdown_to_html(text: str) -> str:
     """
     Convert lightweight markdown conventions to inline-styled HTML.
 
-    Supported:
+    If the text is already HTML (from a rich-text editor), return it as-is.
+
+    Supported markdown:
         **bold** → <strong>
         Lines starting with '- ' → <ul><li> blocks
         Double newlines → <p> paragraph breaks
     """
+    # If already HTML, return as-is
+    if is_html(text):
+        return text
+
     # Escape HTML entities first
     text = text.replace("&", "&amp;").replace("<", "&lt;").replace(">", "&gt;")
 
@@ -59,32 +70,36 @@ def wrap_html_email(
     linkedin_url: Optional[str] = None,
     github_url: Optional[str] = None,
     sender_name: Optional[str] = None,
+    skip_footer: bool = False,
 ) -> str:
     """
     Wrap converted HTML body in a minimal HTML document with
-    inline styles (Gmail-like appearance) and a footer with
-    clickable LinkedIn / GitHub links.
-    """
-    # Build footer links
-    footer_links = []
-    if linkedin_url:
-        footer_links.append(
-            f'<a href="{linkedin_url}" style="color:#1a73e8;text-decoration:underline;">LinkedIn</a>'
-        )
-    if github_url:
-        footer_links.append(
-            f'<a href="{github_url}" style="color:#1a73e8;text-decoration:underline;">GitHub</a>'
-        )
+    inline styles (Gmail-like appearance) and optionally a footer
+    with clickable LinkedIn / GitHub links.
 
+    When skip_footer=True (HTML templates with inline links), the
+    footer is omitted since links are already in the body.
+    """
     footer_html = ""
-    if footer_links:
-        separator = ' <span style="color:#999;">&nbsp;|&nbsp;</span> '
-        footer_html = (
-            '<div style="margin-top:24px;padding-top:12px;'
-            'border-top:1px solid #e0e0e0;font-size:13px;color:#666;">'
-            f'{separator.join(footer_links)}'
-            "</div>"
-        )
+    if not skip_footer:
+        footer_links = []
+        if linkedin_url:
+            footer_links.append(
+                f'<a href="{linkedin_url}" style="color:#1a73e8;text-decoration:underline;">LinkedIn</a>'
+            )
+        if github_url:
+            footer_links.append(
+                f'<a href="{github_url}" style="color:#1a73e8;text-decoration:underline;">GitHub</a>'
+            )
+
+        if footer_links:
+            separator = ' <span style="color:#999;">&nbsp;|&nbsp;</span> '
+            footer_html = (
+                '<div style="margin-top:24px;padding-top:12px;'
+                'border-top:1px solid #e0e0e0;font-size:13px;color:#666;">'
+                f'{separator.join(footer_links)}'
+                "</div>"
+            )
 
     return (
         "<!DOCTYPE html>"
@@ -105,10 +120,25 @@ def build_plain_text_fallback(
 ) -> str:
     """
     Build a plain-text version of the email.
-    Strips **bold** markers and appends footer links as plain URLs.
+    Handles both HTML and markdown-formatted bodies.
     """
-    # Strip bold markers
-    plain = body.replace("**", "")
+    plain = body
+
+    if is_html(body):
+        # Convert HTML to plain text
+        # Replace <br> and block-level closings with newlines
+        plain = re.sub(r"<br\s*/?>", "\n", plain)
+        plain = re.sub(r"</p>", "\n\n", plain)
+        plain = re.sub(r"</li>", "\n", plain)
+        # Strip remaining HTML tags
+        plain = re.sub(r"<[^>]+>", "", plain)
+        # Decode common entities
+        plain = plain.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+        # Collapse excessive blank lines
+        plain = re.sub(r"\n{3,}", "\n\n", plain).strip()
+    else:
+        # Strip bold markers
+        plain = body.replace("**", "")
 
     # Append footer links
     links = []

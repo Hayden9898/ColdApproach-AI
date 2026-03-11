@@ -19,18 +19,7 @@ export const PLACEHOLDERS = {
   ],
 } as const;
 
-export const DEFAULT_TEMPLATE = `Hi [First Name],
-
-I came across [Company Name] and was impressed by [specific company detail]. Your work in [company focus area] aligns closely with my experience in software engineering.
-
-[resume highlights - bullet points]
-
-I'd love to connect and explore how I could contribute to your team. Would you be open to a brief chat?
-
-Best,
-[Sender Name]
-[LinkedIn]
-[GitHub]`;
+export const DEFAULT_TEMPLATE = `<p>Hi [First Name],</p><p>I came across [Company Name] and was impressed by [specific company detail]. Your work in [company focus area] aligns closely with my experience in software engineering.</p><p>[resume highlights - bullet points]</p><p>I'd love to connect and explore how I could contribute to your team. Would you be open to a brief chat?</p><p>Best,<br>[Sender Name]<br>[LinkedIn]<br>[GitHub]</p>`;
 
 export const DEFAULT_SUBJECT_TEMPLATE =
   "Exploring opportunities at [Company Name]";

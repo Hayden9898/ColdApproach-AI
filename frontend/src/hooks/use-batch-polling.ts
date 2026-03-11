@@ -18,7 +18,6 @@ export function useBatchPolling(jobId: string | null) {
   const subjectTemplate = useAppStore((s) => s.subjectTemplate);
   const linkedinUrl = useAppStore((s) => s.linkedinUrl);
   const githubUrl = useAppStore((s) => s.githubUrl);
-  const smoothGrammar = useAppStore((s) => s.smoothGrammar);
   const setBatchJobId = useAppStore((s) => s.setBatchJobId);
 
   const submitBatch = useMutation({
@@ -32,7 +31,6 @@ export function useBatchPolling(jobId: string | null) {
         subject_template: subjectTemplate,
         linkedin_url: linkedinUrl || null,
         github_url: githubUrl || null,
-        smooth_grammar: smoothGrammar,
         send_at: sendAt ?? null,
       }),
     onSuccess: (data) => {
@@ -42,11 +40,28 @@ export function useBatchPolling(jobId: string | null) {
 
   const batchData = useQuery({
     queryKey: ["batch-status", jobId],
-    queryFn: () => batchStatus(jobId!),
+    queryFn: async () => {
+      try {
+        return await batchStatus(jobId!);
+      } catch (err) {
+        // If the job no longer exists (server restarted), clear the stale ID
+        if (err instanceof ApiError && err.status === 404) {
+          setBatchJobId(null);
+          queryClient.removeQueries({ queryKey: ["batch-status"] });
+        }
+        throw err;
+      }
+    },
     enabled: !!jobId,
     refetchInterval: (query) => {
       const status = query.state.data?.status;
-      return status === "completed" ? false : 3000;
+      if (status === "completed" || status === "failed") return false;
+      return 3000;
+    },
+    retry: (failureCount, error) => {
+      // Don't retry 404s — the job is gone
+      if (error instanceof ApiError && error.status === 404) return false;
+      return failureCount < 3;
     },
   });
 

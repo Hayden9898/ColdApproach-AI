@@ -14,7 +14,6 @@ interface AppState {
   githubUrl: string;
   template: string;
   subjectTemplate: string;
-  smoothGrammar: boolean;
   fromEmail: string;
   onboardingStep: number;
   onboardingStarted: boolean;
@@ -35,7 +34,6 @@ interface AppState {
   setLinks: (linkedin: string, github: string) => void;
   setTemplate: (template: string) => void;
   setSubjectTemplate: (subjectTemplate: string) => void;
-  setSmoothGrammar: (v: boolean) => void;
   setFromEmail: (email: string) => void;
   setOnboardingStep: (step: number) => void;
   setOnboardingStarted: (started: boolean) => void;
@@ -65,7 +63,6 @@ export const useAppStore = create<AppState>()(
       githubUrl: "",
       template: DEFAULT_TEMPLATE,
       subjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
-      smoothGrammar: true,
       fromEmail: "",
       draftTemplate: DEFAULT_TEMPLATE,
       draftSubjectTemplate: DEFAULT_SUBJECT_TEMPLATE,
@@ -92,7 +89,6 @@ export const useAppStore = create<AppState>()(
 
       setTemplate: (template) => set({ template }),
       setSubjectTemplate: (subjectTemplate) => set({ subjectTemplate }),
-      setSmoothGrammar: (v) => set({ smoothGrammar: v }),
       setFromEmail: (email) => set({ fromEmail: email }),
       setOnboardingStep: (step) => set({ onboardingStep: step }),
       setOnboardingStarted: (started) => set({ onboardingStarted: started }),
@@ -151,7 +147,6 @@ export const useAppStore = create<AppState>()(
         githubUrl: state.githubUrl,
         template: state.template,
         subjectTemplate: state.subjectTemplate,
-        smoothGrammar: state.smoothGrammar,
         fromEmail: state.fromEmail,
         onboardingStep: state.onboardingStep,
         onboardingStarted: state.onboardingStarted,

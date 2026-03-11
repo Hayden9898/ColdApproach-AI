@@ -136,16 +136,19 @@ def generate_email(request: GenerateEmailRequest):
         subject_template=request.subject_template,
         linkedin_url=request.linkedin_url,
         github_url=request.github_url,
-        smooth_grammar=request.smooth_grammar,
     )
 
     # 4. Build HTML version for preview
     linkedin = email_result.get("linkedin_url", "")
     github = email_result.get("github_url", "")
     sender_name = (resume_profile or {}).get("name", "")
+    body_is_html = email_result.get("is_html", False)
 
     body_html = markdown_to_html(email_result["body"])
-    html_body = wrap_html_email(body_html, linkedin, github, sender_name)
+    html_body = wrap_html_email(
+        body_html, linkedin, github, sender_name,
+        skip_footer=body_is_html,
+    )
 
     # 5. Build SES-ready response
     response = {

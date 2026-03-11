@@ -148,3 +148,121 @@
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
 }
+
+/* ─── TipTap editor styles ─── */
+.tiptap {
+  outline: none;
+}
+
+.tiptap p {
+  margin: 0 0 0.75em 0;
+}
+
+.tiptap p:last-child {
+  margin-bottom: 0;
+}
+
+.tiptap ul,
+.tiptap ol {
+  padding-left: 1.25em;
+  margin: 0.5em 0;
+}
+
+.tiptap ul {
+  list-style-type: disc;
+}
+
+.tiptap ol {
+  list-style-type: decimal;
+}
+
+.tiptap li {
+  margin-bottom: 0.25em;
+}
+
+.tiptap li p {
+  margin: 0;
+}
+
+.tiptap a {
+  color: oklch(0.68 0.12 250);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  cursor: pointer;
+}
+
+.tiptap strong {
+  font-weight: 600;
+}
+
+.tiptap em {
+  font-style: italic;
+}
+
+.tiptap u {
+  text-decoration: underline;
+}
+
+/* Placeholder styling */
+.tiptap p.is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  float: left;
+  color: oklch(0.55 0.010 260);
+  pointer-events: none;
+  height: 0;
+}
+
+/* ─── Email preview rendered HTML ─── */
+.email-preview-html p {
+  margin: 0 0 0.75em 0;
+}
+
+.email-preview-html p:last-child {
+  margin-bottom: 0;
+}
+
+.email-preview-html ul,
+.email-preview-html ol {
+  padding-left: 1.25em;
+  margin: 0.5em 0;
+}
+
+.email-preview-html ul {
+  list-style-type: disc;
+}
+
+.email-preview-html ol {
+  list-style-type: decimal;
+}
+
+.email-preview-html li {
+  margin-bottom: 0.25em;
+}
+
+.email-preview-html li p {
+  margin: 0;
+}
+
+.email-preview-html a {
+  color: oklch(0.68 0.12 250);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+
+.email-preview-html strong {
+  font-weight: 600;
+}
+
+.email-preview-html em {
+  font-style: italic;
+}
+
+.email-preview-html u {
+  text-decoration: underline;
+}
+
+.email-preview-html .ai-filled {
+  font-style: italic;
+  opacity: 0.8;
+  color: var(--primary);
+}

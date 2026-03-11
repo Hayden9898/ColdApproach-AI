@@ -1,4 +1,16 @@
+import json
+import logging
+import re
 from typing import Any, Dict, List, Optional
+
+logger = logging.getLogger(__name__)
+
+# Contextual placeholders that GPT fills (the token text inside brackets)
+CONTEXTUAL_PLACEHOLDER_KEYS = [
+    "specific company detail",
+    "company focus area",
+    "resume highlights - bullet points",
+]
 
 
 def get_client():
@@ -273,10 +285,175 @@ def _fill_deterministic_placeholders(
         # Collapse excessive blank lines left behind
         filled = re.sub(r"\n{3,}", "\n\n", filled)
     else:
-        filled = filled.replace("[LinkedIn]", urls["linkedin_url"])
-        filled = filled.replace("[GitHub]", urls["github_url"])
+        # Leave [LinkedIn] and [GitHub] placeholders intact for
+        # _fill_link_placeholders() to convert into <a> tags
+        pass
 
     return filled
+
+
+def _is_html_template(template: str) -> bool:
+    """Check if a template appears to be HTML (from a rich-text editor)."""
+    return bool(re.search(r"<(?:p|div|br|ul|ol|li|strong|em|a|span|h[1-6])\b", template))
+
+
+def _fill_link_placeholders(
+    template: str,
+    linkedin_url: Optional[str] = None,
+    github_url: Optional[str] = None,
+) -> str:
+    """Replace [LinkedIn]/[GitHub] with inline <a> tags for HTML templates."""
+    if linkedin_url:
+        href = linkedin_url if linkedin_url.startswith("http") else f"https://{linkedin_url}"
+        template = template.replace(
+            "[LinkedIn]",
+            f'<a href="{href}" style="color:#1a73e8;text-decoration:underline;">LinkedIn</a>',
+        )
+    else:
+        template = template.replace("[LinkedIn]", "")
+
+    if github_url:
+        href = github_url if github_url.startswith("http") else f"https://{github_url}"
+        template = template.replace(
+            "[GitHub]",
+            f'<a href="{href}" style="color:#1a73e8;text-decoration:underline;">GitHub</a>',
+        )
+    else:
+        template = template.replace("[GitHub]", "")
+
+    return template
+
+
+def _find_contextual_placeholders(template: str) -> List[str]:
+    """Scan template for contextual placeholders that need GPT filling."""
+    found = []
+    for key in CONTEXTUAL_PLACEHOLDER_KEYS:
+        if f"[{key}]" in template:
+            found.append(key)
+    return found
+
+
+def _strip_html_for_context(html: str) -> str:
+    """Strip HTML tags to produce a readable plaintext version for GPT context."""
+    text = re.sub(r"<br\s*/?>", "\n", html)
+    text = re.sub(r"</p>", "\n\n", text)
+    text = re.sub(r"</li>", "\n", text)
+    text = re.sub(r"<[^>]+>", "", text)
+    text = text.replace("&amp;", "&").replace("&lt;", "<").replace("&gt;", ">")
+    return re.sub(r"\n{3,}", "\n\n", text).strip()
+
+
+def _generate_placeholder_fills(
+    placeholders: List[str],
+    scraped_data: Dict[str, Any],
+    company_data: Optional[Dict[str, Any]] = None,
+    resume_data: Optional[Dict[str, Any]] = None,
+    contact_data: Optional[Dict[str, Any]] = None,
+    template_context: Optional[str] = None,
+    smooth_grammar: bool = True,
+) -> Dict[str, str]:
+    """
+    Ask GPT for ONLY the fill values as JSON.
+    The HTML template is passed as read-only context (stripped to plaintext)
+    so GPT understands the surrounding sentences and can match grammar/tone,
+    but it never edits the template directly.
+    """
+    client = get_client()
+    sections = _build_context_sections(scraped_data, company_data, resume_data, contact_data)
+
+    # Add the template as read-only context so GPT can see surrounding text
+    if template_context:
+        plain_template = _strip_html_for_context(template_context)
+        sections.append(
+            "--- Email template (read-only context) ---\n"
+            "The values you generate will be inserted into this template. "
+            "Use it to understand the surrounding text so your values flow naturally.\n\n"
+            f"{plain_template}"
+        )
+
+    placeholder_descriptions = []
+    for p in placeholders:
+        if p == "specific company detail":
+            placeholder_descriptions.append(
+                f'"{p}": A specific, concrete detail about the company\'s product, tech, or mission '
+                '(not a generic compliment). 1 sentence max.'
+            )
+        elif p == "company focus area":
+            placeholder_descriptions.append(
+                f'"{p}": The company\'s primary domain or focus area (e.g. "fintech and developer tooling"). '
+                'A few words, not a full sentence.'
+            )
+        elif p == "resume highlights - bullet points":
+            placeholder_descriptions.append(
+                f'"{p}": 3-4 concise bullet points as an HTML list. '
+                'Format: "<ul><li>point</li><li>point</li></ul>". '
+                'Prioritize recent work experience. If a project is directly relevant to the company\'s domain, '
+                'include it. Wrap key metrics in <strong> tags (e.g. <strong>$1.6M+</strong>).'
+            )
+
+    grammar_note = ""
+    if smooth_grammar:
+        grammar_note = (
+            "IMPORTANT: Each value will be dropped directly into the template. "
+            "Make sure the value reads naturally in context — match the grammar, "
+            "tense, and tone of the surrounding sentence.\n\n"
+        )
+
+    sections.append(
+        "Given the context above, provide fill values for these placeholders.\n\n"
+        + grammar_note
+        + "Placeholders to fill:\n"
+        + "\n".join(f"- {desc}" for desc in placeholder_descriptions)
+        + "\n\n"
+        "Return ONLY valid JSON — no markdown fences, no explanation. Format:\n"
+        "{\n"
+        + ",\n".join(f'  "{p}": "..."' for p in placeholders)
+        + "\n}"
+    )
+
+    prompt = "\n\n".join(sections)
+
+    response = client.responses.create(
+        model="gpt-5-nano",
+        input=[
+            {
+                "role": "system",
+                "content": (
+                    "You generate specific, relevant fill values for email template placeholders. "
+                    "Return ONLY valid JSON. No markdown code fences. No extra text."
+                ),
+            },
+            {"role": "user", "content": prompt},
+        ],
+    )
+
+    raw_text = None
+    for block in response.output:
+        if hasattr(block, "content") and block.content:
+            for item in block.content:
+                if hasattr(item, "text"):
+                    raw_text = item.text
+                    break
+        if raw_text:
+            break
+
+    if not raw_text:
+        raise RuntimeError("No text found in OpenAI response for placeholder fills.")
+
+    # Parse JSON — strip markdown fences if GPT added them despite instructions
+    cleaned = raw_text.strip()
+    if cleaned.startswith("```"):
+        cleaned = re.sub(r"^```(?:json)?\s*", "", cleaned)
+        cleaned = re.sub(r"\s*```$", "", cleaned)
+
+    try:
+        fills = json.loads(cleaned)
+    except json.JSONDecodeError:
+        logger.warning("GPT returned invalid JSON for placeholder fills: %s", cleaned)
+        # Fallback: return empty fills so the template still renders (with raw placeholders)
+        fills = {}
+
+    return fills
 
 
 def generate_template_prompt(
@@ -291,11 +468,16 @@ def generate_template_prompt(
     Build a prompt that instructs GPT to fill contextual placeholders
     in a pre-filled template using the scraped/company/resume context.
 
+    Handles both plaintext and HTML templates. When the template is HTML,
+    GPT is instructed to preserve all HTML tags and formatting.
+
     When smooth_grammar is True, GPT may make minor grammar adjustments
     around placeholders for natural flow. When False, GPT must not
     modify any text outside the brackets.
     """
     sections = _build_context_sections(scraped_data, company_data, resume_data, contact_data)
+
+    is_html = _is_html_template(pre_filled_template)
 
     if smooth_grammar:
         structure_rules = (
@@ -310,6 +492,25 @@ def generate_template_prompt(
             "- Keep the template's tone and structure exactly as written\n"
         )
 
+    if is_html:
+        html_rules = (
+            "- IMPORTANT: The template is in HTML format. Preserve ALL HTML tags, attributes, "
+            "and inline styles exactly as they are. Only replace the bracketed placeholder text.\n"
+            "- For [resume highlights - bullet points], output an HTML unordered list: "
+            "<ul><li>point 1</li><li>point 2</li><li>point 3</li></ul>\n"
+            "- Wrap key metrics and numbers in <strong> tags (e.g. <strong>$1.6M+</strong>)\n"
+        )
+        bullet_format = ""
+    else:
+        html_rules = ""
+        bullet_format = (
+            "- For [resume highlights - bullet points], prioritize more recent internships and work experience. "
+            "If a project is exceptionally strong or directly relevant to the company's domain "
+            "(e.g., a financial tracker project when emailing a fintech company), include it as a supplementary highlight. "
+            "Create concise bullet points prefixed with `- ` (one per line)\n"
+            "- Wrap key metrics and numbers in **double asterisks** (e.g. **$1.6M+**, **83%**, **10k+ sessions**)\n"
+        )
+
     sections.append(
         "You have been given a partially filled email template below. "
         "Your job is to fill in the remaining bracketed placeholders "
@@ -317,11 +518,11 @@ def generate_template_prompt(
         "using the context data provided above.\n\n"
         "Rules:\n"
         "- Replace each bracketed placeholder with specific, relevant content from the context\n"
-        "- For [resume highlights - bullet points], prioritize more recent internships and work experience. "
+        + bullet_format
+        + html_rules
+        + "- For [resume highlights - bullet points], prioritize more recent internships and work experience. "
         "If a project is exceptionally strong or directly relevant to the company's domain "
-        "(e.g., a financial tracker project when emailing a fintech company), include it as a supplementary highlight. "
-        "Create concise bullet points prefixed with `- ` (one per line)\n"
-        "- Wrap key metrics and numbers in **double asterisks** (e.g. **$1.6M+**, **83%**, **10k+ sessions**)\n"
+        "(e.g., a financial tracker project when emailing a fintech company), include it as a supplementary highlight.\n"
         "- Do NOT include LinkedIn/GitHub URLs in the body — they are added separately\n"
         + structure_rules
         + "- Do NOT add content outside the placeholders\n"
@@ -374,7 +575,6 @@ def get_openai_response(
     subject_template: Optional[str] = None,
     linkedin_url: Optional[str] = None,
     github_url: Optional[str] = None,
-    smooth_grammar: bool = True,
 ) -> Dict[str, str]:
     """
     Generate a personalized cold email using GPT.
@@ -384,30 +584,72 @@ def get_openai_response(
         "template" — fill user-provided template with context data (default)
         "ml"       — fully GPT-generated email (locked, not yet available)
     """
-    client = get_client()
-
-    # Resolve link URLs once for use in return value and placeholder stripping
     resolved_urls = _resolve_link_urls(resume_data, linkedin_url, github_url)
 
+    # ── HTML template pipeline ──────────────────────────────────────
+    # GPT never sees HTML. We ask for JSON fill values and string-replace.
+    if mode == "template" and template and _is_html_template(template):
+        # 1. Deterministic replacements (keep links inline as <a> tags)
+        filled = _fill_deterministic_placeholders(
+            template, company_data, contact_data, resume_data,
+            linkedin_url, github_url,
+            strip_link_placeholders=False,
+        )
+        # Replace [LinkedIn]/[GitHub] with inline <a> tags
+        filled = _fill_link_placeholders(
+            filled,
+            resolved_urls.get("linkedin_url"),
+            resolved_urls.get("github_url"),
+        )
+
+        # 2. Find which contextual placeholders remain
+        remaining = _find_contextual_placeholders(filled)
+
+        # 3. If any contextual placeholders exist, ask GPT for JSON fills
+        if remaining:
+            fills = _generate_placeholder_fills(
+                remaining, scraped_data, company_data, resume_data, contact_data,
+                template_context=filled,
+            )
+            for key, value in fills.items():
+                filled = filled.replace(f"[{key}]", value)
+
+        # 4. Build subject
+        subject = ""
+        if subject_template:
+            subject = _fill_deterministic_placeholders(
+                subject_template, company_data, contact_data, resume_data,
+                linkedin_url, github_url,
+            )
+        else:
+            company_name = (company_data or {}).get("name", "your company")
+            subject = f"Contributing to {company_name}'s mission"
+
+        return {
+            "subject": subject,
+            "body": filled,
+            "is_html": True,
+            **resolved_urls,
+        }
+
+    # ── Plaintext template pipeline (existing) ──────────────────────
+    client = get_client()
+
     if mode == "template" and template:
-        # Pass 1: deterministic replacements (strip links — they go in HTML footer)
         pre_filled = _fill_deterministic_placeholders(
             template, company_data, contact_data, resume_data,
             linkedin_url, github_url,
             strip_link_placeholders=True,
         )
 
-        # Pass 2: GPT fills contextual placeholders
         prompt = generate_template_prompt(
             pre_filled, scraped_data, company_data, resume_data, contact_data,
-            smooth_grammar=smooth_grammar,
         )
         system_msg = (
             "You fill in email templates by replacing bracketed placeholders "
             "with specific, relevant content. Preserve the template structure exactly."
         )
     else:
-        # From-scratch generation (future ML mode foundation)
         prompt = generate_prompt(scraped_data, company_data, resume_data, contact_data)
         system_msg = (
             "You write short, personalized cold outreach emails for software engineers. "
@@ -423,7 +665,6 @@ def get_openai_response(
         ],
     )
 
-    # Extract text from response
     raw_text = None
     for block in response.output:
         if hasattr(block, "content") and block.content:
@@ -438,7 +679,6 @@ def get_openai_response(
         raise RuntimeError("No text found in OpenAI response.")
 
     if mode == "template" and template:
-        # Template mode: body is the raw GPT output, subject from template or default
         subject = ""
         if subject_template:
             subject = _fill_deterministic_placeholders(
