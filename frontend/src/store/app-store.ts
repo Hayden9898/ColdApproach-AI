@@ -27,6 +27,7 @@ interface AppState {
 
   // Dashboard
   queue: QueueItem[];
+  batchJobId: string | null;
 
   // Actions
   setResumeData: (id: string, profile: ResumeProfile) => void;
@@ -41,6 +42,7 @@ interface AppState {
   setEmailConnected: (connected: boolean) => void;
   setDraftTemplate: (template: string) => void;
   setDraftSubjectTemplate: (subjectTemplate: string) => void;
+  setBatchJobId: (jobId: string | null) => void;
   completeOnboarding: () => void;
   resetOnboarding: () => void;
   addToQueue: (id: string, url: string) => void;
@@ -72,6 +74,7 @@ export const useAppStore = create<AppState>()(
       onboardingComplete: false,
       emailConnected: false,
       queue: [],
+      batchJobId: null,
 
       setResumeData: (id, profile) =>
         set({
@@ -96,6 +99,7 @@ export const useAppStore = create<AppState>()(
       setEmailConnected: (connected) => set({ emailConnected: connected }),
       setDraftTemplate: (template) => set({ draftTemplate: template }),
       setDraftSubjectTemplate: (subjectTemplate) => set({ draftSubjectTemplate: subjectTemplate }),
+      setBatchJobId: (jobId) => set({ batchJobId: jobId }),
 
       completeOnboarding: () => set({ onboardingComplete: true }),
 
@@ -114,6 +118,7 @@ export const useAppStore = create<AppState>()(
           onboardingComplete: false,
           emailConnected: false,
           queue: [],
+          batchJobId: null,
         }),
 
       addToQueue: (id, url) =>
@@ -152,6 +157,7 @@ export const useAppStore = create<AppState>()(
         onboardingStarted: state.onboardingStarted,
         onboardingComplete: state.onboardingComplete,
         emailConnected: state.emailConnected,
+        batchJobId: state.batchJobId,
       }),
     },
   ),

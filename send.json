@@ -1,0 +1,7 @@
+{
+  "from_email": "your.gmail@gmail.com",
+  "to_email": "TO_EMAIL_FROM_GENERATE_RESPONSE",
+  "subject": "SUBJECT_FROM_GENERATE_RESPONSE",
+  "body": "BODY_FROM_GENERATE_RESPONSE",
+  "html_body": "HTML_BODY_FROM_GENERATE_RESPONSE"
+}

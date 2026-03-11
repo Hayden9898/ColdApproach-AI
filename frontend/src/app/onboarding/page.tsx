@@ -8,6 +8,7 @@ import { ResumeUpload } from "@/components/onboarding/resume-upload";
 import { ProfileSetup } from "@/components/onboarding/profile-setup";
 import { TemplateEditor } from "@/components/onboarding/template-editor";
 import { EmailPreview } from "@/components/onboarding/email-preview";
+import { UrlSubmit } from "@/components/onboarding/url-submit";
 import { Button } from "@/components/ui/button";
 import { slideRight, fadeIn, DURATION } from "@/lib/animations";
 import { cn } from "@/lib/utils";
@@ -19,9 +20,9 @@ const PdfViewer = dynamic(
     import("@/components/onboarding/pdf-viewer").then((mod) => mod.PdfViewer),
   { ssr: false },
 );
-import { ArrowLeft, ArrowRight, Globe, UserSearch, Mail, Send } from "lucide-react";
+import { ArrowRight, Globe, UserSearch, Mail, Send } from "lucide-react";
 
-const STEPS = ["Resume", "Profile", "Template", "Ready"];
+const STEPS = ["Resume", "Profile", "Template", "Send"];
 
 const HOW_IT_WORKS = [
   {
@@ -229,25 +230,7 @@ export default function OnboardingPage() {
               )}
 
               {step === 3 && (
-                <div className="space-y-4">
-                  <h2 className="text-lg font-semibold tracking-tight">
-                    Ready to go
-                  </h2>
-                  <p className="text-sm text-muted-foreground">
-                    Step 3 will build this out.
-                  </p>
-                  <div className="flex justify-between">
-                    <Button
-                      onClick={() => setStep(2)}
-                      variant="ghost"
-                      size="sm"
-                      className="gap-1.5 hover:bg-transparent hover:text-primary dark:hover:bg-transparent"
-                    >
-                      <ArrowLeft className="h-3.5 w-3.5" />
-                      Back
-                    </Button>
-                  </div>
-                </div>
+                <UrlSubmit onBack={() => setStep(2)} />
               )}
             </motion.div>
           </AnimatePresence>

@@ -117,13 +117,40 @@ export interface ProjectEntry {
   description: string | string[];
 }
 
+export interface BatchUrlResult {
+  status: "queued" | "processing" | "sent" | "scheduled" | "failed";
+  email?: {
+    subject: string;
+    body: string;
+    html_body: string;
+    to_email: string | null;
+    to_name: string | null;
+  };
+  contact?: {
+    name: string;
+    title: string | null;
+    email: string;
+    seniority: string | null;
+    confidence: number | null;
+  } | null;
+  company?: {
+    name: string | null;
+    domain: string | null;
+    industry: string | null;
+    description: string | null;
+    employee_count: number | string | null;
+  } | null;
+  message_id?: string;
+  error?: string;
+}
+
 export interface BatchStatusResponse {
   job_id: string;
   status: "queued" | "processing" | "completed" | "failed";
   total: number;
   completed: number;
   failed: number;
-  results: Record<string, unknown>;
+  results: Record<string, BatchUrlResult>;
 }
 
 // ── Frontend-only State Types ──────────────────────────
