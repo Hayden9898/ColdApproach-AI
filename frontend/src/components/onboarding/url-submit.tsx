@@ -459,10 +459,17 @@ export function UrlSubmit({ onBack }: UrlSubmitProps) {
                 {/* Contact info for completed */}
                 {(result.status === "sent" || result.status === "scheduled") &&
                   result.contact && (
-                    <p className="text-xs text-muted-foreground pl-6">
-                      {result.contact.name}
-                      {result.contact.email && ` · ${result.contact.email}`}
-                    </p>
+                    <div className="flex items-center gap-2 pl-6">
+                      <p className="text-xs text-muted-foreground">
+                        {result.contact.name}
+                        {result.contact.email && ` · ${result.contact.email}`}
+                      </p>
+                      {result.contact.title && (
+                        <span className="text-[10px] font-medium px-1.5 py-0.5 rounded-full bg-teal-500/10 text-teal-400">
+                          {result.contact.title}
+                        </span>
+                      )}
+                    </div>
                   )}
 
                 {/* Error for failed */}
