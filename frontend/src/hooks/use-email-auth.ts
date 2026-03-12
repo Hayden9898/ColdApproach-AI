@@ -64,7 +64,7 @@ export function useEmailAuth(email: string) {
   }, []);
 
   // One-time check of last-authenticated (no polling)
-  const { data, refetch } = useQuery({
+  const { data } = useQuery({
     queryKey: ["gmail-last-authenticated"],
     queryFn: checkLastAuthenticated,
     enabled: status === "checking" && isGmail,
@@ -104,22 +104,47 @@ export function useEmailAuth(email: string) {
     const popup = window.open(getGmailLoginUrl(), "gmail-auth", "width=500,height=700");
 
     if (!popup) {
-      // Fallback: full-page redirect if popup blocked
       window.location.href = getGmailLoginUrl();
       return;
     }
 
+    let resolved = false;
+
+    const verifyAuth = () => {
+      if (resolved) return;
+      resolved = true;
+      window.removeEventListener("message", handleMessage);
+
+      checkLastAuthenticated().then((res) => {
+        const authedEmail = res.email?.toLowerCase();
+        const expectedEmail = email.trim().toLowerCase();
+        if (authedEmail === expectedEmail) {
+          setStatus("connected");
+          setEmailConnected(true);
+          verifiedEmailRef.current = expectedEmail;
+        } else if (res.email) {
+          setStatus("mismatch");
+          setMismatchEmail(res.email);
+        }
+      });
+    };
+
+    // Primary: postMessage from the callback page
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "GMAIL_AUTH_SUCCESS") {
-        setStatus("checking");
-        refetch();
-        window.removeEventListener("message", handleMessage);
-      }
+      if (event.data?.type === "GMAIL_AUTH_SUCCESS") verifyAuth();
     };
 
     window.addEventListener("message", handleMessage);
-  }, [isGmail, refetch]);
+
+    // Fallback: detect when popup/tab closes (in case postMessage doesn't fire)
+    const poll = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(poll);
+        verifyAuth();
+      }
+    }, 500);
+  }, [isGmail, email, setEmailConnected]);
 
   // Reset to idle so user can try again
   const retry = useCallback(() => {
