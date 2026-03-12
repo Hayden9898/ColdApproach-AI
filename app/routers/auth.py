@@ -96,7 +96,7 @@ def gmail_callback(code: str = Query(...), error: str = Query(None)):
         "provider": "gmail",
     })
 
-    return RedirectResponse(url=f"{FRONTEND_URL}/onboarding")
+    return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback?status=success")
 
 
 @router.get("/gmail/status", dependencies=[Depends(verify_api_key)])

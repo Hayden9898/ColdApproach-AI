@@ -64,7 +64,7 @@ export function useEmailAuth(email: string) {
   }, []);
 
   // One-time check of last-authenticated (no polling)
-  const { data } = useQuery({
+  const { data, refetch } = useQuery({
     queryKey: ["gmail-last-authenticated"],
     queryFn: checkLastAuthenticated,
     enabled: status === "checking" && isGmail,
@@ -97,11 +97,29 @@ export function useEmailAuth(email: string) {
     }
   }, [data, status, email, setEmailConnected]);
 
-  // Full-page redirect to Gmail OAuth
+  // Open Gmail OAuth in a popup/tab (preserves current page state)
   const startAuth = useCallback(() => {
     if (!isGmail) return;
-    window.location.href = getGmailLoginUrl();
-  }, [isGmail]);
+
+    const popup = window.open(getGmailLoginUrl(), "gmail-auth", "width=500,height=700");
+
+    if (!popup) {
+      // Fallback: full-page redirect if popup blocked
+      window.location.href = getGmailLoginUrl();
+      return;
+    }
+
+    const handleMessage = (event: MessageEvent) => {
+      if (event.origin !== window.location.origin) return;
+      if (event.data?.type === "GMAIL_AUTH_SUCCESS") {
+        setStatus("checking");
+        refetch();
+        window.removeEventListener("message", handleMessage);
+      }
+    };
+
+    window.addEventListener("message", handleMessage);
+  }, [isGmail, refetch]);
 
   // Reset to idle so user can try again
   const retry = useCallback(() => {
