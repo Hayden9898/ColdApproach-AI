@@ -43,11 +43,11 @@ app.include_router(scrape.router, dependencies=_auth)
 app.include_router(send.router, dependencies=_auth)
 app.include_router(analytics.router, dependencies=_auth)
 app.include_router(contacts.router, dependencies=_auth)
-app.include_router(resume.router, dependencies=_auth)
 app.include_router(batch.router, dependencies=_auth)
 
-# Auth router — selective protection (login/callback are open, status endpoints are protected)
-app.include_router(auth.router)
+# Unprotected routers — accessible before JWT is issued
+app.include_router(resume.router)  # Step 0: resume upload happens before Gmail OAuth
+app.include_router(auth.router)    # login/callback are open, status is protected internally
 
 
 @app.get("/")
