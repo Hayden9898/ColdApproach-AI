@@ -230,7 +230,7 @@ export default function OnboardingPage() {
               )}
 
               {step === 3 && (
-                <UrlSubmit onBack={() => setStep(2)} />
+                <UrlSubmit onBack={() => setStep(2)} onReupload={() => setStep(0)} />
               )}
             </motion.div>
           </AnimatePresence>

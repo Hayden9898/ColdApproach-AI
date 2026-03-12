@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, KeyboardEvent } from "react";
+import { useState, useEffect, useMemo, KeyboardEvent } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import {
   ArrowLeft,
@@ -8,6 +8,7 @@ import {
   Loader2,
   Check,
   AlertCircle,
+  Paperclip,
   Send,
   Clock,
   Globe,
@@ -24,6 +25,7 @@ import {
 import { cn } from "@/lib/utils";
 import { useAppStore } from "@/store/app-store";
 import { useBatchPolling } from "@/hooks/use-batch-polling";
+import { checkResumeStatus, ApiError } from "@/lib/api";
 import { slideUp, DURATION } from "@/lib/animations";
 import type { BatchUrlResult } from "@/types/api";
 
@@ -31,6 +33,7 @@ const BATCH_LIMIT = 20;
 
 interface UrlSubmitProps {
   onBack: () => void;
+  onReupload: () => void;
 }
 
 function extractDomain(url: string): string {
@@ -113,9 +116,24 @@ function StatusIcon({ status }: { status: BatchUrlResult["status"] }) {
   }
 }
 
-export function UrlSubmit({ onBack }: UrlSubmitProps) {
+export function UrlSubmit({ onBack, onReupload }: UrlSubmitProps) {
   const batchJobId = useAppStore((s) => s.batchJobId);
+  const resumeId = useAppStore((s) => s.resumeId);
   const completeOnboarding = useAppStore((s) => s.completeOnboarding);
+
+  // Check if resume is still available in the backend
+  const [resumeMissing, setResumeMissing] = useState(false);
+  useEffect(() => {
+    if (!resumeId) {
+      setResumeMissing(true);
+      return;
+    }
+    checkResumeStatus(resumeId).catch((err) => {
+      if (err instanceof ApiError && err.status === 404) {
+        setResumeMissing(true);
+      }
+    });
+  }, [resumeId]);
 
   const { submitBatch, batchData, isSubmitting, isPolling, reset, submitError } =
     useBatchPolling(batchJobId);
@@ -248,6 +266,23 @@ export function UrlSubmit({ onBack }: UrlSubmitProps) {
               : "Add company URLs one at a time. Press Enter to add each URL."}
         </p>
       </div>
+
+      {/* Resume missing indicator */}
+      {resumeMissing && phase === "input" && (
+        <div className="flex items-center gap-1.5">
+          <Paperclip className="h-3 w-3 text-amber-500" />
+          <p className="text-xs text-amber-500">
+            Resume not attached —{" "}
+            <button
+              type="button"
+              onClick={onReupload}
+              className="underline hover:text-amber-400 transition-colors"
+            >
+              go back and add it
+            </button>
+          </p>
+        </div>
+      )}
 
       {/* Send mode toggle — visible in input and complete phases */}
       {phase !== "processing" && (

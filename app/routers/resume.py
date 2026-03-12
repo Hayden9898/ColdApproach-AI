@@ -3,11 +3,19 @@ from typing import Dict
 from fastapi import APIRouter, File, HTTPException, UploadFile
 
 from app.utils.resume_parser import extract_resume_text, format_resume, is_resume
-from app.utils.resume_store import save_resume
+from app.utils.resume_store import get_resume, save_resume
 
 router = APIRouter(prefix="/resume", tags=["resume"])
 
 PDF_MIME_TYPE = "application/pdf"
+
+
+@router.get("/{resume_id}/status")
+def resume_status(resume_id: str) -> Dict:
+    """Check if a resume is still available in the in-memory store."""
+    if not get_resume(resume_id):
+        raise HTTPException(status_code=404, detail="Resume not found.")
+    return {"available": True, "resume_id": resume_id}
 
 
 @router.post("/upload")

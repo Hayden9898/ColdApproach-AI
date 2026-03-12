@@ -86,6 +86,12 @@ export async function batchStatus(
   return request(`/batch/${jobId}/status`);
 }
 
+export async function checkResumeStatus(
+  resumeId: string,
+): Promise<{ available: boolean; resume_id: string }> {
+  return request(`/resume/${resumeId}/status`);
+}
+
 export function getGmailLoginUrl(): string {
   return `${API_BASE}/auth/gmail/login`;
 }
