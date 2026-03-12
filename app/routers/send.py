@@ -6,9 +6,11 @@ Supports instant and scheduled sends.
 
 from datetime import datetime, timezone
 
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, Depends, HTTPException
 
 from pydantic import BaseModel
+
+from app.utils.auth import verify_jwt_or_api_key
 
 from app.models.schemas import SendEmailRequest, SendEmailResponse, SESVerifyRequest
 from app.services.provider_factory import get_provider
@@ -139,7 +141,7 @@ class SendDraftRequest(BaseModel):
     from_email: str
 
 
-@router.post("/draft")
+@router.post("/draft", dependencies=[Depends(verify_jwt_or_api_key)])
 def send_draft(request: SendDraftRequest):
     """Send a Gmail draft by ID (used by Lambda at scheduled time)."""
     provider = get_provider(request.from_email)

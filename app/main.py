@@ -9,7 +9,7 @@ load_dotenv()
 
 from app.routers import scrape, send, analytics, contacts, resume, auth, batch
 from app.services.batch_worker import start_worker, stop_worker
-from app.utils.auth import verify_api_key
+from app.utils.auth import verify_jwt
 
 CORS_ORIGINS = [
     o.strip()
@@ -37,8 +37,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Protected routers — require bearer token
-_auth = [Depends(verify_api_key)]
+# Protected routers — require JWT
+_auth = [Depends(verify_jwt)]
 app.include_router(scrape.router, dependencies=_auth)
 app.include_router(send.router, dependencies=_auth)
 app.include_router(analytics.router, dependencies=_auth)

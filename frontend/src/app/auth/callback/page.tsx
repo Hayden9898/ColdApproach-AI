@@ -1,25 +1,32 @@
 "use client";
 
 import { useEffect } from "react";
+import { useSearchParams } from "next/navigation";
 
 /**
  * OAuth callback landing page — opened inside a popup/tab by startAuth().
- * Sends a postMessage to the opener window and closes itself.
+ * Reads JWT from query params, sends it to the opener window via postMessage,
+ * and closes itself.
  */
 export default function AuthCallbackPage() {
+  const searchParams = useSearchParams();
+
   useEffect(() => {
-    if (window.opener) {
+    const jwt = searchParams.get("jwt");
+    const email = searchParams.get("email");
+
+    if (window.opener && jwt) {
       window.opener.postMessage(
-        { type: "GMAIL_AUTH_SUCCESS" },
+        { type: "GMAIL_AUTH_SUCCESS", jwt, email },
         window.location.origin,
       );
       window.close();
     }
-  }, []);
+  }, [searchParams]);
 
   return (
     <div className="flex h-screen items-center justify-center">
-      <p className="text-muted-foreground">Authorizing… this window will close automatically.</p>
+      <p className="text-muted-foreground">Authorizing... this window will close automatically.</p>
     </div>
   );
 }

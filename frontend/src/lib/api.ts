@@ -7,9 +7,9 @@ import type {
   BatchSubmitRequest,
   BatchStatusResponse,
 } from "@/types/api";
+import { useAppStore } from "@/store/app-store";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
-const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
 
 class ApiError extends Error {
   constructor(
@@ -22,8 +22,9 @@ class ApiError extends Error {
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
   const headers = new Headers(options?.headers);
-  if (API_KEY) {
-    headers.set("Authorization", `Bearer ${API_KEY}`);
+  const jwt = useAppStore.getState().jwt;
+  if (jwt) {
+    headers.set("Authorization", `Bearer ${jwt}`);
   }
 
   const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
@@ -66,7 +67,7 @@ export async function sendEmail(
 export async function checkGmailStatus(
   email: string,
 ): Promise<{ authenticated: boolean; email: string }> {
-  return request(`/auth/gmail/status?email=${encodeURIComponent(email)}`);
+  return request(`/auth/gmail/status`);
 }
 
 export async function batchSubmit(
@@ -83,10 +84,6 @@ export async function batchStatus(
   jobId: string,
 ): Promise<BatchStatusResponse> {
   return request(`/batch/${jobId}/status`);
-}
-
-export async function checkLastAuthenticated(): Promise<{ email: string | null }> {
-  return request("/auth/gmail/last-authenticated");
 }
 
 export function getGmailLoginUrl(): string {

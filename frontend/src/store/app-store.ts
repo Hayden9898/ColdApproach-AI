@@ -19,6 +19,7 @@ interface AppState {
   onboardingStarted: boolean;
   onboardingComplete: boolean;
   emailConnected: boolean;
+  jwt: string | null;
 
   // Template drafts (transient, not persisted)
   draftTemplate: string;
@@ -38,6 +39,7 @@ interface AppState {
   setOnboardingStep: (step: number) => void;
   setOnboardingStarted: (started: boolean) => void;
   setEmailConnected: (connected: boolean) => void;
+  setJwt: (jwt: string | null) => void;
   setDraftTemplate: (template: string) => void;
   setDraftSubjectTemplate: (subjectTemplate: string) => void;
   setBatchJobId: (jobId: string | null) => void;
@@ -70,6 +72,7 @@ export const useAppStore = create<AppState>()(
       onboardingStarted: false,
       onboardingComplete: false,
       emailConnected: false,
+      jwt: null,
       queue: [],
       batchJobId: null,
 
@@ -93,6 +96,7 @@ export const useAppStore = create<AppState>()(
       setOnboardingStep: (step) => set({ onboardingStep: step }),
       setOnboardingStarted: (started) => set({ onboardingStarted: started }),
       setEmailConnected: (connected) => set({ emailConnected: connected }),
+      setJwt: (jwt) => set({ jwt }),
       setDraftTemplate: (template) => set({ draftTemplate: template }),
       setDraftSubjectTemplate: (subjectTemplate) => set({ draftSubjectTemplate: subjectTemplate }),
       setBatchJobId: (jobId) => set({ batchJobId: jobId }),
@@ -113,6 +117,7 @@ export const useAppStore = create<AppState>()(
           onboardingStarted: false,
           onboardingComplete: false,
           emailConnected: false,
+          jwt: null,
           queue: [],
           batchJobId: null,
         }),
@@ -149,6 +154,7 @@ export const useAppStore = create<AppState>()(
         onboardingStarted: state.onboardingStarted,
         onboardingComplete: state.onboardingComplete,
         emailConnected: state.emailConnected,
+        jwt: state.jwt,
         batchJobId: state.batchJobId,
       }),
     },

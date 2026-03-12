@@ -1,8 +1,7 @@
 "use client";
 
 import { useState, useRef, useCallback, useEffect } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { checkLastAuthenticated, checkGmailStatus, getGmailLoginUrl } from "@/lib/api";
+import { checkGmailStatus, getGmailLoginUrl } from "@/lib/api";
 import { useAppStore } from "@/store/app-store";
 
 type AuthStatus = "idle" | "checking" | "connected" | "mismatch" | "error";
@@ -20,7 +19,10 @@ export function useEmailAuth(email: string) {
   const verifiedEmailRef = useRef<string | null>(null);
   const hasCheckedOnMount = useRef(false);
   const setEmailConnected = useAppStore((s) => s.setEmailConnected);
+  const setJwt = useAppStore((s) => s.setJwt);
+  const setFromEmail = useAppStore((s) => s.setFromEmail);
   const emailConnected = useAppStore((s) => s.emailConnected);
+  const jwt = useAppStore((s) => s.jwt);
 
   const isGmail = isGmailAddress(email);
 
@@ -30,17 +32,17 @@ export function useEmailAuth(email: string) {
       setStatus("idle");
       setMismatchEmail(null);
       setEmailConnected(false);
+      setJwt(null);
       verifiedEmailRef.current = null;
     }
-  }, [email, setEmailConnected]);
+  }, [email, setEmailConnected, setJwt]);
 
-  // On mount: if already connected, restore. Otherwise, check if user just returned from OAuth.
+  // On mount: if already connected with a JWT, verify the backend still has the OAuth token
   useEffect(() => {
     if (hasCheckedOnMount.current) return;
     hasCheckedOnMount.current = true;
 
-    if (emailConnected) {
-      // Verify the backend still has the OAuth token (lost on server restart)
+    if (emailConnected && jwt) {
       checkGmailStatus(email)
         .then((res) => {
           if (res.authenticated) {
@@ -48,54 +50,18 @@ export function useEmailAuth(email: string) {
             verifiedEmailRef.current = email.toLowerCase();
           } else {
             setEmailConnected(false);
+            setJwt(null);
             setStatus("idle");
           }
         })
         .catch(() => {
-          // Backend unreachable — reset to safe state
           setEmailConnected(false);
+          setJwt(null);
           setStatus("idle");
         });
-    } else if (isGmail) {
-      // User may have just returned from OAuth redirect — check once
-      setStatus("checking");
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
-
-  // One-time check of last-authenticated (no polling)
-  const { data } = useQuery({
-    queryKey: ["gmail-last-authenticated"],
-    queryFn: checkLastAuthenticated,
-    enabled: status === "checking" && isGmail,
-    retry: false,
-    staleTime: 0,
-  });
-
-  // React to the one-time check result
-  useEffect(() => {
-    if (status !== "checking") return;
-
-    if (data === undefined) return; // still loading
-
-    if (!data?.email) {
-      // No one has authenticated yet — go back to idle
-      setStatus("idle");
-      return;
-    }
-
-    const authedEmail = data.email.toLowerCase();
-    const expectedEmail = email.trim().toLowerCase();
-
-    if (authedEmail === expectedEmail) {
-      setStatus("connected");
-      setEmailConnected(true);
-      verifiedEmailRef.current = expectedEmail;
-    } else {
-      setStatus("mismatch");
-      setMismatchEmail(data.email);
-    }
-  }, [data, status, email, setEmailConnected]);
 
   // Open Gmail OAuth in a popup/tab (preserves current page state)
   const startAuth = useCallback(() => {
@@ -110,49 +76,56 @@ export function useEmailAuth(email: string) {
 
     let resolved = false;
 
-    const verifyAuth = () => {
+    const handleAuthSuccess = (authJwt: string, authEmail: string) => {
       if (resolved) return;
       resolved = true;
       window.removeEventListener("message", handleMessage);
 
-      checkLastAuthenticated().then((res) => {
-        const authedEmail = res.email?.toLowerCase();
-        const expectedEmail = email.trim().toLowerCase();
-        if (authedEmail === expectedEmail) {
-          setStatus("connected");
-          setEmailConnected(true);
-          verifiedEmailRef.current = expectedEmail;
-        } else if (res.email) {
-          setStatus("mismatch");
-          setMismatchEmail(res.email);
-        }
-      });
+      const expectedEmail = email.trim().toLowerCase();
+      if (authEmail.toLowerCase() === expectedEmail) {
+        setJwt(authJwt);
+        setFromEmail(authEmail);
+        setEmailConnected(true);
+        setStatus("connected");
+        verifiedEmailRef.current = expectedEmail;
+      } else {
+        setStatus("mismatch");
+        setMismatchEmail(authEmail);
+      }
     };
 
     // Primary: postMessage from the callback page
     const handleMessage = (event: MessageEvent) => {
       if (event.origin !== window.location.origin) return;
-      if (event.data?.type === "GMAIL_AUTH_SUCCESS") verifyAuth();
+      if (event.data?.type === "GMAIL_AUTH_SUCCESS" && event.data.jwt) {
+        handleAuthSuccess(event.data.jwt, event.data.email);
+      }
     };
 
     window.addEventListener("message", handleMessage);
 
-    // Fallback: detect when popup/tab closes (in case postMessage doesn't fire)
+    // Fallback: detect when popup/tab closes without postMessage
     const poll = setInterval(() => {
       if (popup.closed) {
         clearInterval(poll);
-        verifyAuth();
+        if (!resolved) {
+          resolved = true;
+          window.removeEventListener("message", handleMessage);
+          // Popup closed without sending message — user may have cancelled
+          setStatus("idle");
+        }
       }
     }, 500);
-  }, [isGmail, email, setEmailConnected]);
+  }, [isGmail, email, setJwt, setFromEmail, setEmailConnected]);
 
   // Reset to idle so user can try again
   const retry = useCallback(() => {
     setStatus("idle");
     setMismatchEmail(null);
     setEmailConnected(false);
+    setJwt(null);
     verifiedEmailRef.current = null;
-  }, [setEmailConnected]);
+  }, [setEmailConnected, setJwt]);
 
   return {
     isGmail,

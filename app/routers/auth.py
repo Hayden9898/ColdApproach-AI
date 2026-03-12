@@ -4,12 +4,14 @@ Currently supports Gmail; extensible for Outlook/Microsoft.
 """
 
 import os
+from urllib.parse import urlencode
 
 from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
-from app.utils.auth import verify_api_key
-from app.utils.token_store import get_last_authenticated, get_token, save_token
+from app.utils.auth import verify_jwt
+from app.utils.jwt_manager import create_token
+from app.utils.token_store import get_token, save_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -49,6 +51,7 @@ def gmail_callback(code: str = Query(...), error: str = Query(None)):
     """
     Handle Google OAuth2 callback.
     Exchange authorization code for access + refresh tokens, store keyed by email.
+    Returns a JWT to the frontend via redirect query param.
     """
     if error:
         raise HTTPException(status_code=400, detail=f"OAuth error: {error}")
@@ -96,12 +99,16 @@ def gmail_callback(code: str = Query(...), error: str = Query(None)):
         "provider": "gmail",
     })
 
-    return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback?status=success")
+    # Generate JWT for this user
+    user_jwt = create_token(user_email)
+
+    params = urlencode({"jwt": user_jwt, "email": user_email})
+    return RedirectResponse(url=f"{FRONTEND_URL}/auth/callback?{params}")
 
 
-@router.get("/gmail/status", dependencies=[Depends(verify_api_key)])
-def gmail_status(email: str = Query(...)):
-    """Check if a Gmail account has a valid OAuth token."""
+@router.get("/gmail/status", dependencies=[Depends(verify_jwt)])
+def gmail_status(email: str = Depends(verify_jwt)):
+    """Check if the authenticated user has a valid OAuth token."""
     token = get_token(email)
     if token:
         return {"authenticated": True, "email": email, "provider": "gmail"}
@@ -110,10 +117,3 @@ def gmail_status(email: str = Query(...)):
         "email": email,
         "detail": "No token found. Complete /auth/gmail/login first.",
     }
-
-
-@router.get("/gmail/last-authenticated", dependencies=[Depends(verify_api_key)])
-def last_authenticated():
-    """Return the email of the most recently authenticated Gmail user."""
-    email = get_last_authenticated()
-    return {"email": email}
