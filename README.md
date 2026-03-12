@@ -3,6 +3,7 @@
 **AI-powered cold email outreach — from resume to sent inbox in one flow.**
 
 Research companies. Find the right contact. Generate personalized emails. Send or schedule — all automatically.
+Try it out here: [link](https://cold-approach-ai-self.vercel.app/onboarding)
 
 [![FastAPI](https://img.shields.io/badge/FastAPI-009688?style=flat&logo=fastapi&logoColor=white)](https://fastapi.tiangolo.com/)
 [![Next.js](https://img.shields.io/badge/Next.js_16-000000?style=flat&logo=next.js&logoColor=white)](https://nextjs.org/)
