@@ -9,6 +9,7 @@ import type {
 } from "@/types/api";
 
 const API_BASE = process.env.NEXT_PUBLIC_API_URL || "http://localhost:8000";
+const API_KEY = process.env.NEXT_PUBLIC_API_KEY || "";
 
 class ApiError extends Error {
   constructor(
@@ -20,7 +21,12 @@ class ApiError extends Error {
 }
 
 async function request<T>(path: string, options?: RequestInit): Promise<T> {
-  const res = await fetch(`${API_BASE}${path}`, options);
+  const headers = new Headers(options?.headers);
+  if (API_KEY) {
+    headers.set("Authorization", `Bearer ${API_KEY}`);
+  }
+
+  const res = await fetch(`${API_BASE}${path}`, { ...options, headers });
   if (!res.ok) {
     const data = await res.json().catch(() => null);
     throw new ApiError(res.status, data);

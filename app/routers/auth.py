@@ -5,9 +5,10 @@ Currently supports Gmail; extensible for Outlook/Microsoft.
 
 import os
 
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import RedirectResponse
 
+from app.utils.auth import verify_api_key
 from app.utils.token_store import get_last_authenticated, get_token, save_token
 
 router = APIRouter(prefix="/auth", tags=["auth"])
@@ -98,7 +99,7 @@ def gmail_callback(code: str = Query(...), error: str = Query(None)):
     return RedirectResponse(url=f"{FRONTEND_URL}/onboarding")
 
 
-@router.get("/gmail/status")
+@router.get("/gmail/status", dependencies=[Depends(verify_api_key)])
 def gmail_status(email: str = Query(...)):
     """Check if a Gmail account has a valid OAuth token."""
     token = get_token(email)
@@ -111,7 +112,7 @@ def gmail_status(email: str = Query(...)):
     }
 
 
-@router.get("/gmail/last-authenticated")
+@router.get("/gmail/last-authenticated", dependencies=[Depends(verify_api_key)])
 def last_authenticated():
     """Return the email of the most recently authenticated Gmail user."""
     email = get_last_authenticated()

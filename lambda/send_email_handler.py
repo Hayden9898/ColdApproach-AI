@@ -9,6 +9,7 @@ import os
 import urllib.request
 
 API_BASE_URL = os.environ.get("API_BASE_URL", "http://localhost:8000")
+API_KEY = os.environ.get("API_KEY", "")
 
 
 def handler(event, context):
@@ -24,10 +25,14 @@ def handler(event, context):
         "from_email": from_email,
     }).encode()
 
+    headers = {"Content-Type": "application/json"}
+    if API_KEY:
+        headers["Authorization"] = f"Bearer {API_KEY}"
+
     send_req = urllib.request.Request(
         send_url,
         data=send_body,
-        headers={"Content-Type": "application/json"},
+        headers=headers,
         method="POST",
     )
 
