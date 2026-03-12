@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { Suspense, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 
 /**
@@ -8,7 +8,7 @@ import { useSearchParams } from "next/navigation";
  * Reads JWT from query params, sends it to the opener window via postMessage,
  * and closes itself.
  */
-export default function AuthCallbackPage() {
+function CallbackHandler() {
   const searchParams = useSearchParams();
 
   useEffect(() => {
@@ -25,8 +25,16 @@ export default function AuthCallbackPage() {
   }, [searchParams]);
 
   return (
+    <p className="text-muted-foreground">Authorizing... this window will close automatically.</p>
+  );
+}
+
+export default function AuthCallbackPage() {
+  return (
     <div className="flex h-screen items-center justify-center">
-      <p className="text-muted-foreground">Authorizing... this window will close automatically.</p>
+      <Suspense fallback={<p className="text-muted-foreground">Loading...</p>}>
+        <CallbackHandler />
+      </Suspense>
     </div>
   );
 }

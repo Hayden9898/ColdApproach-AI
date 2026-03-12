@@ -370,8 +370,10 @@ export function UrlSubmit({ onBack }: UrlSubmitProps) {
               className="font-mono text-sm"
               disabled={urls.length >= BATCH_LIMIT}
             />
-            {inputError && (
+            {inputError ? (
               <p className="text-xs text-destructive">{inputError}</p>
+            ) : (
+              <p className="text-xs text-muted-foreground">Press ↵ to add</p>
             )}
           </div>
 
