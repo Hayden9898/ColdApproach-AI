@@ -1,4 +1,4 @@
-# 🧊 ColdReach AI
+# 🧊 ColdApproach-AI
 
 **AI-powered cold email outreach — from resume to sent inbox in one flow.**
 
@@ -20,7 +20,7 @@ Try it out here: [link](https://cold-approach-ai-self.vercel.app/onboarding)
 
 Connecting with startups and professionals is time-consuming — researching companies, finding the right person, and writing personalized outreach takes hours. Most "AI outreach" tools solve this by blasting generic templates.
 
-**ColdReach AI takes the opposite approach.** It automates the research and writing while keeping every message specific, relevant, and human. The system scrapes company data, discovers contacts via Hunter.io, ranks the best-fit person by role and company size, and generates a personalized cold email using your resume and a customizable template — all through a guided onboarding flow or a single API call.
+**ColdApproach-AI takes the opposite approach.** It automates the research and writing while keeping every message specific, relevant, and human. The system scrapes company data, discovers contacts via Hunter.io, ranks the best-fit person by role and company size, and generates a personalized cold email using your resume and a customizable template — all through a guided onboarding flow or a single API call.
 
 ---
 
